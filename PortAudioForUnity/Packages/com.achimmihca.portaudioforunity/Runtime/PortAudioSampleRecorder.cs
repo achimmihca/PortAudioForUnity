@@ -17,6 +17,7 @@ namespace PortAudioForUnity
         public int OutputChannelCount { get; private set; }
         public int SampleRate { get; private set; }
         public uint SamplesPerBuffer { get; private set; }
+        public int SampleBufferLengthInSeconds { get; private set; }
         public bool Loop { get; private set; }
 
         private readonly Audio portAudioSharpAudio;
@@ -63,6 +64,7 @@ namespace PortAudioForUnity
             OutputChannelCount = outputChannelCount;
             SampleRate = sampleRate;
             SamplesPerBuffer = samplesPerBuffer;
+            SampleBufferLengthInSeconds = sampleBufferLengthInSeconds;
             Loop = loop;
             playRecordedSamples = outputDeviceIndex >= 0 && outputChannelCount >= 1;
             recordedSamples = new float[sampleRate * sampleBufferLengthInSeconds];

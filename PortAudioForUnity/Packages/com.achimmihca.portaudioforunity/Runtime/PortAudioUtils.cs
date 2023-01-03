@@ -145,19 +145,33 @@ namespace PortAudioForUnity
             InitializeIfNotDoneYet();
 
             int inputDeviceIndex = GetInputDeviceIndex(inputDeviceName);
-            foreach (PortAudioSampleRecorder existingSampleRecorder in sampleRecorders)
+            int outputDeviceIndex = string.IsNullOrEmpty(outputDeviceName)
+                ? -1
+                : GetOutputDeviceIndex(outputDeviceName);
+
+            PortAudioSampleRecorder existingSampleRecorder = GetSampleRecorderByInputDeviceName(inputDeviceName);
+            if (existingSampleRecorder != null)
             {
-                if (existingSampleRecorder.InputDeviceIndex == inputDeviceIndex)
+                if (existingSampleRecorder.InputDeviceIndex != inputDeviceIndex
+                    || existingSampleRecorder.Loop != loop
+                    || existingSampleRecorder.SampleBufferLengthInSeconds != bufferLengthInSeconds
+                    || existingSampleRecorder.SampleRate != sampleRate
+                    || existingSampleRecorder.InputChannelIndex != inputChannelIndex
+                    || existingSampleRecorder.OutputDeviceIndex != outputDeviceIndex)
                 {
-                    throw new PortAudioException($"Already started recording with input device '{inputDeviceName}'");
+                    // Cannot reuse existing sample recorder. Dispose the old one and create a new one.
+                    existingSampleRecorder.Dispose();
+                    sampleRecorders.Remove(existingSampleRecorder);
+                }
+                else
+                {
+                    // Reuse existing sample recorder.
+                    existingSampleRecorder.StartRecording();
+                    return existingSampleRecorder.AudioClip;
                 }
             }
 
             GetInputDeviceCapabilities(inputDeviceName, out int minSampleRate, out int maxSampleRate, out int maxInputChannelCount);
-
-            int outputDeviceIndex = string.IsNullOrEmpty(outputDeviceName)
-                ? -1
-                : GetOutputDeviceIndex(outputDeviceName);
 
             // Recording is always done in mono from one of the input device's channels.
             // Thus, the output is also mono (i.e., output channel count is 1).
