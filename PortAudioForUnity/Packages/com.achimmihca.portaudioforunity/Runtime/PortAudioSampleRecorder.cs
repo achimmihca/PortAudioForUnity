@@ -22,9 +22,9 @@ namespace PortAudioForUnity
         public bool Loop { get; private set; }
 
         private readonly Audio portAudioSharpAudio;
+        private readonly bool playRecordedSamples;
         private readonly float[] recordedSamples;
         private readonly float[] allRecordedSamples;
-        private readonly bool playRecordedSamples;
         private int writeSingleChannelSampleBufferIndex;
         private int writeAllChannelSampleBufferIndex;
         private int recordedSampleCountSinceLastCallToGetPosition;
@@ -197,8 +197,18 @@ namespace PortAudioForUnity
                 return;
             }
 
+            ResetRecordedSamples();
             portAudioSharpAudio.Start();
             IsRecording = true;
+        }
+
+        private void ResetRecordedSamples()
+        {
+            Array.Clear(recordedSamples, 0, recordedSamples.Length);
+            Array.Clear(allRecordedSamples, 0, allRecordedSamples.Length);
+            writeAllChannelSampleBufferIndex = 0;
+            writeSingleChannelSampleBufferIndex = 0;
+            recordedSampleCountSinceLastCallToGetPosition = 0;
         }
 
         public void StopRecording()

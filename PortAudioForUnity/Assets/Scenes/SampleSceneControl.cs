@@ -18,6 +18,8 @@ public class SampleSceneControl : MonoBehaviour
     private string inputDeviceName;
     private string outputDeviceName;
 
+    private Button startRecordingButton;
+    private Button stopRecordingButton;
     private VisualElement firstChannelAudioWaveForm;
     private VisualElement secondChannelAudioWaveForm;
     private AudioWaveFormVisualization firstChannelAudioWaveFormVisualization;
@@ -65,7 +67,7 @@ public class SampleSceneControl : MonoBehaviour
         if (!loop)
         {
             Debug.Log($"Will stop recording in {recordingLengthInSeconds} seconds");
-            StartCoroutine(ExecuteAfterDelayInSeconds(recordingLengthInSeconds, () => StopRecording()));
+            StartCoroutine(ExecuteAfterDelayInSeconds(recordingLengthInSeconds, () => StopRecordingAndPlayRecordedAudio()));
         }
 
         InitUi();
@@ -109,15 +111,22 @@ public class SampleSceneControl : MonoBehaviour
     private void InitUi()
     {
         UIDocument uiDocument = FindObjectOfType<UIDocument>();
-        Button startRecordingButton = uiDocument.rootVisualElement.Q<Button>("startRecordingButton");
-        Button stopRecordingButton = uiDocument.rootVisualElement.Q<Button>("stopRecordingButton");
+        startRecordingButton = uiDocument.rootVisualElement.Q<Button>("startRecordingButton");
+        stopRecordingButton = uiDocument.rootVisualElement.Q<Button>("stopRecordingButton");
         firstChannelAudioWaveForm = uiDocument.rootVisualElement.Q<VisualElement>("firstChannelAudioWaveForm");
         secondChannelAudioWaveForm = uiDocument.rootVisualElement.Q<VisualElement>("secondChannelAudioWaveForm");
+
+        startRecordingButton.RegisterCallback<ClickEvent>(evt =>
+            PortAudioMicrophone.Start(inputDeviceName, loop, recordingLengthInSeconds, sampleRate, inputChannelIndex, outputDeviceName));
+        stopRecordingButton.RegisterCallback<ClickEvent>(evt =>
+        {
+            StopRecordingAndPlayRecordedAudio();
+        });
     }
 
-    private void StopRecording()
+    private void StopRecordingAndPlayRecordedAudio()
     {
-        Debug.Log($"StopRecording");
+        Debug.Log($"StopRecordingAndPlayRecordedAudio");
 
         PortAudioMicrophone.End(inputDeviceName);
 
