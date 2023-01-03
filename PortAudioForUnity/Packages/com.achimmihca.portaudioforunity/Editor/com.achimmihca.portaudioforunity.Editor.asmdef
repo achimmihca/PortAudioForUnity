@@ -1,0 +1,17 @@
+{
+    "name": "com.achimmihca.portaudioforunity.Editor",
+    "references": [
+		"com.achimmihca.portaudioforunity"
+    ],
+    "includePlatforms": [
+		"Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

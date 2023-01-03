@@ -1,0 +1,21 @@
+{
+  "name": "com.achimmihca.portaudioforunity",
+  "version": "1.0.0",
+  "displayName": "PortAudio for Unity",
+  "description": "PortAudio for Unity",
+  "keywords": [
+    "audio",
+    "microphone",
+    "record",
+    "portaudio",
+    "latency"
+  ],
+  "author": {
+    "name": "Andreas Stange",
+    "email": "anst.dev@gmail.com",
+    "url": "https://github.com/achimmihca/PortAudioForUnity"
+  },
+  "samples": [
+  ],
+  "type": "library"
+}

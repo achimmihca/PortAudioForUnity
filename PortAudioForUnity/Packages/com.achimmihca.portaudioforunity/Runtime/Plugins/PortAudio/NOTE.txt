@@ -1,0 +1,2 @@
+- The DLLs are a build of portaudio v19.7.0 without ASIO support
+- The C# bindings are from https://github.com/atsushieno/portaudio-sharp
