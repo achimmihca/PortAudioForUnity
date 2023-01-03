@@ -239,6 +239,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   targetFrameRate: 30
   audioSource: {fileID: 1644096721}
+  inputChannelIndex: 0
+  loop: 1
 --- !u!4 &1644096720
 Transform:
   m_ObjectHideFlags: 0

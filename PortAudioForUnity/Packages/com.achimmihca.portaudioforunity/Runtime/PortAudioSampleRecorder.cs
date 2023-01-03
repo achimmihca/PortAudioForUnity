@@ -10,6 +10,7 @@ namespace PortAudioForUnity
     {
         public AudioClip AudioClip { get; private set; }
 
+        public string InputDeviceName { get; private set; }
         public int InputDeviceIndex { get; private set; }
         public int OutputDeviceIndex  { get; private set; }
         public int InputChannelCount  { get; private set; }
@@ -30,6 +31,7 @@ namespace PortAudioForUnity
         private bool isDisposed;
 
         internal PortAudioSampleRecorder(
+            string inputDeviceName,
             int inputDeviceIndex,
             int inputChannelCount,
             int inputChannelIndex,
@@ -58,6 +60,7 @@ namespace PortAudioForUnity
             }
 
             InputDeviceIndex = inputDeviceIndex;
+            InputDeviceName = inputDeviceName;
             InputChannelCount = inputChannelCount;
             InputChannelIndex = inputChannelIndex;
             OutputDeviceIndex = outputDeviceIndex;
@@ -96,7 +99,7 @@ namespace PortAudioForUnity
                 return;
             }
 
-            Debug.Log($"Disposing sample recorder for PortAudio device {InputDeviceIndex}");
+            Debug.Log($"Disposing sample recorder for device '{InputDeviceName}'");
 
             isDisposed = true;
             StopRecording();
@@ -154,11 +157,10 @@ namespace PortAudioForUnity
             if (recordedSamplesIndex > recordedSamples.Length)
             {
                 recordedSamplesIndex = 0;
-                if (Loop)
+                if (!Loop)
                 {
-                    // TODO: Continue recording at start of sample buffer.
+                    return PortAudio.PaStreamCallbackResult.paComplete;
                 }
-                return PortAudio.PaStreamCallbackResult.paComplete;
             }
 
             return PortAudio.PaStreamCallbackResult.paContinue;

@@ -12,6 +12,7 @@ public class SampleSceneControl : MonoBehaviour
     public AudioSource audioSource;
 
     public int inputChannelIndex;
+    public bool loop;
 
     private string inputDeviceName;
     private string outputDeviceName;
@@ -37,7 +38,6 @@ public class SampleSceneControl : MonoBehaviour
         }
         Debug.Log($"Input channel index: {inputChannelIndex}");
 
-        bool loop = true;
         Debug.Log($"Loop recording: {loop}");
 
         AudioClip recordingAudioClip = PortAudioMicrophone.Start(
@@ -49,7 +49,11 @@ public class SampleSceneControl : MonoBehaviour
             outputDeviceName);
         audioSource.clip = recordingAudioClip;
 
-        StartCoroutine(ExecuteAfterDelayInSeconds(RecordingLengthInSeconds, () => StopRecording()));
+        if (!loop)
+        {
+            Debug.Log($"Will stop recording in {RecordingLengthInSeconds} seconds");
+            StartCoroutine(ExecuteAfterDelayInSeconds(RecordingLengthInSeconds, () => StopRecording()));
+        }
 
         Debug.Log("Start done");
     }

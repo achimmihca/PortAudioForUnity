@@ -180,6 +180,7 @@ namespace PortAudioForUnity
                 : 1;
 
             PortAudioSampleRecorder newSampleRecorder = new PortAudioSampleRecorder(
+                inputDeviceName,
                 inputDeviceIndex,
                 maxInputChannelCount,
                 inputChannelIndex,
