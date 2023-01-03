@@ -139,12 +139,14 @@ namespace PortAudioForUnity
             // Read samples from pointer to array.
             // The samples are written to the array in the form
             // [SAMPLE_OF_CHANNEL_0, SAMPLE_OF_CHANNEL_1, ..., SAMPLE_OF_CHANNEL_N, SAMPLE_OF_CHANNEL_0, ...]
-            int readSampleIndex = 0;
+            //
+            int inputSampleIndex = 0;
+            int outputSampleCount = 0;
             for (int sampleIndex = 0; sampleIndex < samplesPerBufferAsInt; sampleIndex++)
             {
                 for (int channelIndex = 0; channelIndex < InputChannelCount; channelIndex++)
                 {
-                    int offsetInArray = readSampleIndex * sizeof(float);
+                    int offsetInArray = inputSampleIndex * sizeof(float);
                     float sample = Marshal.PtrToStructure<float>(input + offsetInArray);
 
                     allRecordedSamples[writeAllChannelSampleBufferIndex] = sample;
@@ -153,11 +155,13 @@ namespace PortAudioForUnity
                     {
                         recordedSamples[writeSingleChannelSampleBufferIndex] = sample;
 
-                        // if (playRecordedSamples)
-                        // {
-                        //     // Write samples to output array. This will play the audio from the speaker.
-                        //     Marshal.StructureToPtr<float>(sample, output + offsetInArray, false);
-                        // }
+                        if (playRecordedSamples)
+                        {
+                            // Write samples to output array. This will play the audio from the speaker.
+                            int outputOffsetInArray = outputSampleCount * sizeof(float);
+                            Marshal.StructureToPtr<float>(sample, output + outputOffsetInArray, false);
+                            outputSampleCount++;
+                        }
                     }
 
                     writeAllChannelSampleBufferIndex++;
@@ -166,7 +170,7 @@ namespace PortAudioForUnity
                         writeAllChannelSampleBufferIndex = 0;
                     }
 
-                    readSampleIndex++;
+                    inputSampleIndex++;
                 }
 
                 writeSingleChannelSampleBufferIndex++;
