@@ -256,6 +256,9 @@ namespace PortAudioForUnity
             Log("Dispose");
             sampleRecorders.ForEach(sampleRecorder => sampleRecorder.Dispose());
             sampleRecorders = new();
+
+            // Wait a short duration such that PortAudio and running recording callbacks have time to shut down properly.
+            Thread.Sleep(100);
         }
 
         private static PortAudioSampleRecorder GetSampleRecorderByInputDeviceName(string inputDeviceName)
@@ -293,19 +296,15 @@ namespace PortAudioForUnity
             }
         }
 
-        public static float[] GetRecordedSamples(string inputDeviceName)
+        public static float[] GetRecordedSamples(string inputDeviceName, int channelIndex)
         {
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
 
-            UpdateAudioClipDataWithRecordedSamples(inputDeviceName);
-
             PortAudioSampleRecorder sampleRecorder = GetSampleRecorderByInputDeviceName(inputDeviceName);
             if (sampleRecorder != null)
             {
-                float[] samples = new float[sampleRecorder.AudioClip.samples];
-                sampleRecorder.AudioClip.GetData(samples, 0);
-                return samples;
+                return sampleRecorder.GetRecordedSamples(channelIndex);
             }
 
             return Array.Empty<float>();

@@ -37,9 +37,9 @@ namespace PortAudioForUnity
             PortAudioUtils.StopRecording(deviceName);
         }
 
-        public static float[] GetRecordedSamples(string deviceName)
+        public static float[] GetRecordedSamples(string deviceName, int channelIndex)
         {
-            return PortAudioUtils.GetRecordedSamples(deviceName);
+            return PortAudioUtils.GetRecordedSamples(deviceName, channelIndex);
         }
 
         public static bool IsRecording(string deviceName)
