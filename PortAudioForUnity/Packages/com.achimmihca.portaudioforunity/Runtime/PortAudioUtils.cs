@@ -158,6 +158,9 @@ namespace PortAudioForUnity
             int outputDeviceIndex = string.IsNullOrEmpty(outputDeviceName)
                 ? -1
                 : GetOutputDeviceIndex(outputDeviceName);
+
+            // Recording is always done in mono from one of the input device's channels.
+            // Thus, the output is also mono (i.e., output channel count is 1).
             int outputChannelCount = string.IsNullOrEmpty(outputDeviceName)
                 ? -1
                 : 1;

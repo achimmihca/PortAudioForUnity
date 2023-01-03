@@ -41,15 +41,19 @@ namespace PortAudioForUnity
         {
             if (inputChannelCount < 0)
             {
-                throw new ArgumentException("Input channel count cannot be negative");
+                throw new ArgumentException($"{nameof(inputChannelCount)} cannot be negative");
+            }
+            if (inputChannelIndex < 0)
+            {
+                throw new ArgumentException($"{nameof(inputChannelIndex)} cannot be negative");
             }
             if (sampleRate < 0)
             {
-                throw new ArgumentException("Sample rate cannot be negative");
+                throw new ArgumentException($"{nameof(sampleRate)} cannot be negative");
             }
             if (sampleBufferLengthInSeconds < 0)
             {
-                throw new ArgumentException("Sample buffer length cannot be negative");
+                throw new ArgumentException($"{nameof(sampleBufferLengthInSeconds)} cannot be negative");
             }
 
             InputDeviceIndex = inputDeviceIndex;
@@ -119,8 +123,11 @@ namespace PortAudioForUnity
                 return PortAudio.PaStreamCallbackResult.paAbort;
             }
 
-            // Read samples from pointer to array
-            for (int i = 0; i < samplesPerBuffer && (recordedSamplesIndex + i) < recordedSamples.Length; i++)
+            // Read samples from pointer to array.
+            // The samples are written to the array in the form
+            // [SAMPLE_OF_CHANNEL_0, SAMPLE_OF_CHANNEL_1, ..., SAMPLE_OF_CHANNEL_N, SAMPLE_OF_CHANNEL_0, ...]
+            // Here, we are interested in only one of the channels. Thus, we skip the samples of the other channels.
+            for (int i = InputChannelIndex; i < samplesPerBuffer && (recordedSamplesIndex + i) < recordedSamples.Length; i += InputChannelCount)
             {
                 int offsetInArray = i * sizeof(float);
                 float sample = Marshal.PtrToStructure<float>(input + offsetInArray);
