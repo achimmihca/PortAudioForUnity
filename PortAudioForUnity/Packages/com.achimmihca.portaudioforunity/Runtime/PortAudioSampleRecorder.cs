@@ -23,9 +23,10 @@ namespace PortAudioForUnity
 
         private readonly Audio portAudioSharpAudio;
         private readonly float[] recordedSamples;
-        private readonly float[][] allRecordedSamples;
+        private readonly float[] allRecordedSamples;
         private readonly bool playRecordedSamples;
-        private int writeSamplesIndex;
+        private int writeSingleChannelSampleBufferIndex;
+        private int writeAllChannelSampleBufferIndex;
         private int recordedSampleCountSinceLastCallToGetPosition;
 
         public bool IsRecording { get; private set; }
@@ -72,12 +73,7 @@ namespace PortAudioForUnity
             Loop = loop;
             playRecordedSamples = outputDeviceIndex >= 0 && outputChannelCount >= 1;
             recordedSamples = new float[sampleRate * sampleBufferLengthInSeconds];
-            allRecordedSamples = new float[inputChannelCount][];
-
-            for (int channelIndex = 0; channelIndex < inputChannelCount; channelIndex++)
-            {
-                allRecordedSamples[channelIndex] = new float[sampleRate * sampleBufferLengthInSeconds];
-            }
+            allRecordedSamples = new float[sampleRate * sampleBufferLengthInSeconds * inputChannelCount];
 
             Debug.Log($"InputChannelCount: {InputChannelCount}, InputChannelIndex: {InputChannelIndex}, playRecordedSamples: {playRecordedSamples}");
 
@@ -90,8 +86,8 @@ namespace PortAudioForUnity
                 samplesPerBuffer,
                 RecordCallback);
 
-            AudioClip = AudioClip.Create("PortAudioSamplesRecorderAudioClip", recordedSamples.Length, inputChannelCount, sampleRate, false);
-            AudioClip.SetData(recordedSamples, 0);
+            AudioClip = AudioClip.Create("PortAudioSamplesRecorderAudioClip", allRecordedSamples.Length, InputChannelCount, sampleRate, false);
+            AudioClip.SetData(allRecordedSamples, 0);
         }
 
         public int GetPosition()
@@ -151,11 +147,11 @@ namespace PortAudioForUnity
                     int offsetInArray = readSampleIndex * sizeof(float);
                     float sample = Marshal.PtrToStructure<float>(input + offsetInArray);
 
-                    allRecordedSamples[channelIndex][writeSamplesIndex] = sample;
+                    allRecordedSamples[writeAllChannelSampleBufferIndex] = sample;
 
                     if (channelIndex == InputChannelIndex)
                     {
-                        recordedSamples[writeSamplesIndex] = sample;
+                        recordedSamples[writeSingleChannelSampleBufferIndex] = sample;
 
                         // if (playRecordedSamples)
                         // {
@@ -164,13 +160,19 @@ namespace PortAudioForUnity
                         // }
                     }
 
+                    writeAllChannelSampleBufferIndex++;
+                    if (writeAllChannelSampleBufferIndex >= allRecordedSamples.Length)
+                    {
+                        writeAllChannelSampleBufferIndex = 0;
+                    }
+
                     readSampleIndex++;
                 }
 
-                writeSamplesIndex++;
-                if (writeSamplesIndex >= recordedSamples.Length)
+                writeSingleChannelSampleBufferIndex++;
+                if (writeSingleChannelSampleBufferIndex >= recordedSamples.Length)
                 {
-                    writeSamplesIndex = 0;
+                    writeSingleChannelSampleBufferIndex = 0;
                     if (!Loop)
                     {
                         return PortAudio.PaStreamCallbackResult.paComplete;
@@ -213,13 +215,20 @@ namespace PortAudioForUnity
 
         public void UpdateAudioClipDataWithRecordedSamples()
         {
-            AudioClip.SetData(recordedSamples, 0);
+            AudioClip.SetData(allRecordedSamples, 0);
         }
 
         public float[] GetRecordedSamples(int channelIndex)
         {
-            float[] channelSamplesCopy = new float[allRecordedSamples[channelIndex].Length];
-            Array.Copy(allRecordedSamples[channelIndex], 0, channelSamplesCopy, 0, channelSamplesCopy.Length);
+            float[] channelSamplesCopy = new float[recordedSamples.Length];
+            int writeSampleIndex = 0;
+            for (int readSampleIndex = channelIndex;
+                readSampleIndex < allRecordedSamples.Length && writeSampleIndex < channelSamplesCopy.Length;
+                readSampleIndex += InputChannelCount)
+            {
+                channelSamplesCopy[writeSampleIndex] = allRecordedSamples[readSampleIndex];
+                writeSampleIndex++;
+            }
             return channelSamplesCopy;
         }
     }
