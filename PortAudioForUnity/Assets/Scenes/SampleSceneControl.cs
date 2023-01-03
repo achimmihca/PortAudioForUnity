@@ -3,14 +3,10 @@ using System.Collections;
 using PortAudioForUnity;
 using UnityEngine;
 
-// See the original portaudio example: http://portaudio.com/docs/v19-doxydocs/paex__record_8c_source.html
-// and the used C# binding of portaudio: https://github.com/tlove123/portaudiosharp
-public class PortAudioTest : MonoBehaviour
+public class SampleSceneControl : MonoBehaviour
 {
     private const int SampleRate = 44100;
-    private const int NumSeconds = 5;
-
-    private static long startTimeMillis;
+    private const int RecordingLengthInSeconds = 5;
 
     public int targetFrameRate = 30;
     public AudioSource audioSource;
@@ -21,37 +17,37 @@ public class PortAudioTest : MonoBehaviour
     private void Awake()
     {
         Application.targetFrameRate = targetFrameRate;
-        startTimeMillis = 0;
     }
 
     private void Start()
     {
         Debug.Log("Start");
-        startTimeMillis = GetUnixTimeMilliseconds();
-
         inputDeviceName = PortAudioUtils.GetDefaultInputDeviceName();
         outputDeviceName = PortAudioUtils.GetDefaultOutputDeviceName();
+        Debug.Log($"Input device: {inputDeviceName}");
+        Debug.Log($"Output device: {outputDeviceName}");
 
         AudioClip recordingAudioClip = PortAudioMicrophone.Start(
             inputDeviceName,
             false,
-            NumSeconds,
+            RecordingLengthInSeconds,
             SampleRate,
             0,
             outputDeviceName);
-
         audioSource.clip = recordingAudioClip;
 
-        StartCoroutine(ExecuteAfterDelayInSeconds(NumSeconds, () => StopRecording()));
+        StartCoroutine(ExecuteAfterDelayInSeconds(RecordingLengthInSeconds, () => StopRecording()));
 
         Debug.Log("Start done");
     }
 
     private void StopRecording()
     {
-        Debug.Log($"Stopping after {(GetUnixTimeMilliseconds() - startTimeMillis) / 1000} seconds");
+        Debug.Log($"StopRecording");
+
         PortAudioMicrophone.End(inputDeviceName);
 
+        // Play recorded samples using Unity's AudioSource
         PortAudioUtils.UpdateAudioClipDataWithRecordedSamples(inputDeviceName);
         audioSource.Play();
     }
@@ -59,13 +55,6 @@ public class PortAudioTest : MonoBehaviour
     private static IEnumerator ExecuteAfterDelayInSeconds(float delayInSeconds, Action action)
     {
         yield return new WaitForSeconds(delayInSeconds);
-        // Code to execute after the delay
         action();
-    }
-
-    private static long GetUnixTimeMilliseconds()
-    {
-        // See https://stackoverflow.com/questions/4016483/get-time-in-milliseconds-using-c-sharp
-        return DateTimeOffset.Now.ToUnixTimeMilliseconds();
     }
 }
