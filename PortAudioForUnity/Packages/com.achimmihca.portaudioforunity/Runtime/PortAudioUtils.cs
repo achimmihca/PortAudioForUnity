@@ -166,6 +166,7 @@ namespace PortAudioForUnity
                 {
                     // Reuse existing sample recorder.
                     existingSampleRecorder.StartRecording();
+                    return;
                 }
             }
 

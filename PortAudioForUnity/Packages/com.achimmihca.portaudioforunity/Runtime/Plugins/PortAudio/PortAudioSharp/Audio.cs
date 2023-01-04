@@ -40,6 +40,7 @@ namespace PortAudioSharp
         private IntPtr stream;
         private static bool loggingEnabled;
         private bool disposed;
+        private bool started;
 
         public static bool LoggingEnabled
         {
@@ -89,6 +90,12 @@ namespace PortAudioSharp
 
         public void Start()
         {
+            if (started)
+            {
+                throw new Exception("Already started");
+            }
+            started = true;
+
             log("Starting...");
             this.stream = streamOpen(this.inputDeviceIndex, this.inputChannels,
                 this.outputDeviceIndex, this.outputChannels,
@@ -99,6 +106,12 @@ namespace PortAudioSharp
 
         public void Stop()
         {
+            if (!started)
+            {
+                throw new Exception("Not yet started");
+            }
+            started = false;
+
             log("Stopping...");
             streamStop(this.stream);
             streamClose(this.stream);
