@@ -267,10 +267,10 @@ namespace PortAudioForUnity
         }
 
         /**
-         * Returns the recorded samples of all channels in the form
+         * Writes the recorded samples of all channels to the buffer in the form
          * [sample_channel_0, sample_channel_1, ..., sample_channel_n, sample_channel_0, ...]
          */
-        public static float[] GetAllRecordedSamples(string inputDeviceName)
+        public static void GetAllRecordedSamples(string inputDeviceName, float[] bufferToBeFilled)
         {
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
@@ -278,13 +278,14 @@ namespace PortAudioForUnity
             PortAudioSampleRecorder sampleRecorder = GetSampleRecorderByInputDeviceName(inputDeviceName);
             if (sampleRecorder != null)
             {
-                return sampleRecorder.GetAllRecordedSamples();
+                sampleRecorder.GetAllRecordedSamples(bufferToBeFilled);
             }
-
-            return Array.Empty<float>();
         }
 
-        public static float[] GetRecordedSamples(string inputDeviceName, int channelIndex)
+        /**
+         * Writes the recorded samples of one channels to the buffer
+         */
+        public static void GetRecordedSamples(string inputDeviceName, int channelIndex, float[] bufferToBeFilled)
         {
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
@@ -292,10 +293,8 @@ namespace PortAudioForUnity
             PortAudioSampleRecorder sampleRecorder = GetSampleRecorderByInputDeviceName(inputDeviceName);
             if (sampleRecorder != null)
             {
-                return sampleRecorder.GetRecordedSamples(channelIndex);
+                sampleRecorder.GetRecordedSamples(channelIndex, bufferToBeFilled);
             }
-
-            return Array.Empty<float>();
         }
 
         public static int GetSingleChannelRecordingPosition(string inputDeviceName)

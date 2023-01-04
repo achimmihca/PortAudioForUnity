@@ -199,42 +199,38 @@ namespace PortAudioForUnity
             IsRecording = false;
         }
 
-        public float[] GetRecordedSamples(int channelIndex)
+        public void GetRecordedSamples(int channelIndex, float[] bufferToBeFilled)
         {
-            float[] singleChannelSamplesCopy = new float[singleChannelSampleBufferLength];
             // Start with the last written sample of the channel.
             int readAllChannelsSampleIndex = writeAllChannelsSampleBufferIndex - InputChannelCount + channelIndex;
             // Write newer samples to higher index in array, respectively older samples to lower index in array.
-            for (int writeSingleChannelSampleIndex = singleChannelSampleBufferLength - 1; writeSingleChannelSampleIndex >= 0; writeSingleChannelSampleIndex--)
+            for (int writeSingleChannelSampleIndex = bufferToBeFilled.Length - 1; writeSingleChannelSampleIndex >= 0; writeSingleChannelSampleIndex--)
             {
                 if (readAllChannelsSampleIndex < 0)
                 {
                     readAllChannelsSampleIndex += allChannelsRecordedSamples.Length;
                 }
 
-                singleChannelSamplesCopy[writeSingleChannelSampleIndex] = allChannelsRecordedSamples[readAllChannelsSampleIndex];
+                bufferToBeFilled[writeSingleChannelSampleIndex] = allChannelsRecordedSamples[readAllChannelsSampleIndex];
                 readAllChannelsSampleIndex -= InputChannelCount;
             }
-            return singleChannelSamplesCopy;
         }
 
-        public float[] GetAllRecordedSamples()
+        public void GetAllRecordedSamples(float[] bufferToBeFilled)
         {
-            float[] allChannelsSamplesCopy = new float[allChannelsSampleBufferLength];
             // Start with the last written sample.
             int readAllChannelsSampleIndex = writeAllChannelsSampleBufferIndex - 1;
             // Write newer samples to higher index in array, respectively older samples to lower index in array.
-            for (int writeAllChannelsSampleIndex = allChannelsSampleBufferLength - 1; writeAllChannelsSampleIndex >= 0; writeAllChannelsSampleIndex--)
+            for (int writeAllChannelsSampleIndex = bufferToBeFilled.Length - 1; writeAllChannelsSampleIndex >= 0; writeAllChannelsSampleIndex--)
             {
                 if (readAllChannelsSampleIndex < 0)
                 {
                     readAllChannelsSampleIndex += allChannelsRecordedSamples.Length;
                 }
 
-                allChannelsSamplesCopy[writeAllChannelsSampleIndex] = allChannelsRecordedSamples[readAllChannelsSampleIndex];
+                bufferToBeFilled[writeAllChannelsSampleIndex] = allChannelsRecordedSamples[readAllChannelsSampleIndex];
                 readAllChannelsSampleIndex--;
             }
-            return allChannelsSamplesCopy;
         }
 
         public int GetSingleChannelRecordingPosition()

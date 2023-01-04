@@ -76,17 +76,15 @@ namespace PortAudioForUnity
             }
         }
 
-        public static float[] GetRecordedSamples(string deviceName, int channelIndex, AudioClip microphoneAudioClip)
+        public static void GetRecordedSamples(string deviceName, int channelIndex, AudioClip microphoneAudioClip, float[] bufferToBeFilled)
         {
             if (UsePortAudio)
             {
-                return PortAudioUtils.GetRecordedSamples(deviceName, channelIndex);
+                PortAudioUtils.GetRecordedSamples(deviceName, channelIndex, bufferToBeFilled);
             }
             else
             {
-                float[] samples = new float[microphoneAudioClip.samples];
-                microphoneAudioClip.GetData(samples, 0);
-                return samples;
+                microphoneAudioClip.GetData(bufferToBeFilled, 0);
             }
         }
 
