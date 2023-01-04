@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using PortAudioSharp;
-using UnityEditor;
-using UnityEngine;
 
 namespace PortAudioForUnity
 {
@@ -89,8 +87,6 @@ namespace PortAudioForUnity
             {
                 return;
             }
-
-            Debug.Log($"Disposing sample recorder for device '{InputDeviceName}'");
 
             isDisposed = true;
             StopRecording();

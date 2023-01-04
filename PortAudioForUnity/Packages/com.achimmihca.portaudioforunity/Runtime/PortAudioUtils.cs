@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using PortAudioSharp;
-using Unity.VisualScripting;
 using UnityEngine;
 
 namespace PortAudioForUnity
