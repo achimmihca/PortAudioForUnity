@@ -236,5 +236,10 @@ namespace PortAudioForUnity
             }
             return allChannelsSamplesCopy;
         }
+
+        public int GetSingleChannelRecordingPosition()
+        {
+            return writeAllChannelsSampleBufferIndex / InputChannelCount;
+        }
     }
 }

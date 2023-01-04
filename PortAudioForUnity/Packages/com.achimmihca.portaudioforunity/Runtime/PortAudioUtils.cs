@@ -298,6 +298,20 @@ namespace PortAudioForUnity
             return Array.Empty<float>();
         }
 
+        public static int GetSingleChannelRecordingPosition(string inputDeviceName)
+        {
+            ThrowIfNotOnMainThread();
+            InitializeIfNotDoneYet();
+
+            PortAudioSampleRecorder sampleRecorder = GetSampleRecorderByInputDeviceName(inputDeviceName);
+            if (sampleRecorder != null)
+            {
+                return sampleRecorder.GetSingleChannelRecordingPosition();
+            }
+
+            return 0;
+        }
+
         private static int GetOutputDeviceIndex(string deviceName)
         {
             int deviceCount = PortAudio.Pa_GetDeviceCount();

@@ -68,8 +68,7 @@ namespace PortAudioForUnity
         {
             if (UsePortAudio)
             {
-                // No equivalent
-                return 0;
+                return PortAudioUtils.GetSingleChannelRecordingPosition(deviceName);
             }
             else
             {
