@@ -133,7 +133,7 @@ namespace PortAudioForUnity
             throw new PortAudioException($"No output device found with name '{outputDeviceName}'");
         }
 
-        public static AudioClip StartRecording(
+        public static void StartRecording(
             string inputDeviceName,
             bool loop,
             int bufferLengthInSeconds,
@@ -167,7 +167,6 @@ namespace PortAudioForUnity
                 {
                     // Reuse existing sample recorder.
                     existingSampleRecorder.StartRecording();
-                    return existingSampleRecorder.AudioClip;
                 }
             }
 
@@ -193,8 +192,6 @@ namespace PortAudioForUnity
             sampleRecorders.Add(newSampleRecorder);
 
             newSampleRecorder.StartRecording();
-
-            return newSampleRecorder.AudioClip;
         }
 
         public static void StopRecording(string deviceName)
@@ -270,7 +267,11 @@ namespace PortAudioForUnity
             throw new ArgumentException($"No input device found with name {deviceName}");
         }
 
-        public static void UpdateAudioClipDataWithRecordedSamples(string inputDeviceName)
+        /**
+         * Returns the recorded samples of all channels in the form
+         * [sample_channel_0, sample_channel_1, ..., sample_channel_n, sample_channel_0, ...]
+         */
+        public static float[] GetAllRecordedSamples(string inputDeviceName)
         {
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
@@ -278,8 +279,10 @@ namespace PortAudioForUnity
             PortAudioSampleRecorder sampleRecorder = GetSampleRecorderByInputDeviceName(inputDeviceName);
             if (sampleRecorder != null)
             {
-                sampleRecorder.UpdateAudioClipDataWithRecordedSamples();
+                return sampleRecorder.GetAllRecordedSamples();
             }
+
+            return Array.Empty<float>();
         }
 
         public static float[] GetRecordedSamples(string inputDeviceName, int channelIndex)

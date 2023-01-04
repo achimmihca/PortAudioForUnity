@@ -12,7 +12,7 @@ namespace PortAudioForUnity
             {
                 if (UsePortAudio)
                 {
-                    return PortAudioMicrophone.Devices;
+                    return PortAudioUtils.GetInputDeviceNames();
                 }
                 else
                 {
@@ -25,7 +25,7 @@ namespace PortAudioForUnity
         {
             if (UsePortAudio)
             {
-                return PortAudioMicrophone.IsRecording(deviceName);
+                return PortAudioUtils.IsRecording(deviceName);
             }
             else
             {
@@ -36,16 +36,19 @@ namespace PortAudioForUnity
         public static AudioClip Start(
             string deviceName,
             bool loop,
-            int lengthSec,
-            int frequency)
+            int bufferLengthSec,
+            int sampleRate,
+            string outputDeviceName = "",
+            float directOutputAmplificationFactor = 1)
         {
             if (UsePortAudio)
             {
-                return PortAudioMicrophone.Start(deviceName, loop, lengthSec, frequency);
+                PortAudioUtils.StartRecording(deviceName, loop, bufferLengthSec, sampleRate, outputDeviceName, directOutputAmplificationFactor);
+                return null;
             }
             else
             {
-                return Microphone.Start(deviceName, loop, lengthSec, frequency);
+                return Microphone.Start(deviceName, loop, bufferLengthSec, sampleRate);
             }
         }
 
@@ -53,7 +56,7 @@ namespace PortAudioForUnity
         {
             if (UsePortAudio)
             {
-                PortAudioMicrophone.End(deviceName);
+                PortAudioUtils.StopRecording(deviceName);
             }
             else
             {
@@ -96,7 +99,7 @@ namespace PortAudioForUnity
         {
             if (UsePortAudio)
             {
-                PortAudioMicrophone.GetDeviceCaps(deviceName, out minFreq, out maxFreq, out channelCount);
+                PortAudioUtils.GetInputDeviceCapabilities(deviceName, out minFreq, out maxFreq, out channelCount);
             }
             else
             {

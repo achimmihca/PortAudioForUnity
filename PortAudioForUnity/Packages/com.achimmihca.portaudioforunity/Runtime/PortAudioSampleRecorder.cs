@@ -8,8 +8,6 @@ namespace PortAudioForUnity
 {
     internal class PortAudioSampleRecorder : IDisposable
     {
-        public AudioClip AudioClip { get; private set; }
-
         public string InputDeviceName { get; private set; }
         public int InputDeviceIndex { get; private set; }
         public int InputChannelCount  { get; private set; }
@@ -83,9 +81,6 @@ namespace PortAudioForUnity
                 sampleRate,
                 samplesPerBuffer,
                 RecordCallback);
-
-            AudioClip = AudioClip.Create("PortAudioSamplesRecorderAudioClip", allChannelsRecordedSamples.Length, InputChannelCount, sampleRate, false);
-            AudioClip.SetData(allChannelsRecordedSamples, 0);
         }
 
         public void Dispose()
@@ -100,10 +95,6 @@ namespace PortAudioForUnity
             isDisposed = true;
             StopRecording();
             portAudioSharpAudio?.Dispose();
-            if (AudioClip != null)
-            {
-                GameObject.Destroy(AudioClip);
-            }
         }
 
         private PortAudio.PaStreamCallbackResult RecordCallback(
@@ -212,11 +203,6 @@ namespace PortAudioForUnity
             IsRecording = false;
         }
 
-        public void UpdateAudioClipDataWithRecordedSamples()
-        {
-            AudioClip.SetData(allChannelsRecordedSamples, 0);
-        }
-
         public float[] GetRecordedSamples(int channelIndex)
         {
             float[] singleChannelSamplesCopy = new float[singleChannelSampleBufferLength];
@@ -234,6 +220,25 @@ namespace PortAudioForUnity
                 readAllChannelsSampleIndex -= InputChannelCount;
             }
             return singleChannelSamplesCopy;
+        }
+
+        public float[] GetAllRecordedSamples()
+        {
+            float[] allChannelsSamplesCopy = new float[allChannelsSampleBufferLength];
+            // Start with the last written sample.
+            int readAllChannelsSampleIndex = writeAllChannelsSampleBufferIndex - 1;
+            // Write newer samples to higher index in array, respectively older samples to lower index in array.
+            for (int writeAllChannelsSampleIndex = allChannelsSampleBufferLength - 1; writeAllChannelsSampleIndex >= 0; writeAllChannelsSampleIndex--)
+            {
+                if (readAllChannelsSampleIndex < 0)
+                {
+                    readAllChannelsSampleIndex += allChannelsRecordedSamples.Length;
+                }
+
+                allChannelsSamplesCopy[writeAllChannelsSampleIndex] = allChannelsRecordedSamples[readAllChannelsSampleIndex];
+                readAllChannelsSampleIndex--;
+            }
+            return allChannelsSamplesCopy;
         }
     }
 }

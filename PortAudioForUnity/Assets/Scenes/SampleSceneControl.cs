@@ -10,10 +10,13 @@ public class SampleSceneControl : MonoBehaviour
 {
     public int targetFrameRate = 30;
     public AudioSource audioSource;
+    private AudioClip monoAudioClip;
+    private AudioClip allChannelsAudioClip;
 
     public int recordingLengthInSeconds = 2;
     public int sampleRate;
     public int inputChannelCount;
+    public int inputChannelIndex;
     public bool loop;
     public bool directlyPlayRecordedAudio;
     public float directlyPlayRecordedAudioAmplificationFactor = 1;
@@ -23,6 +26,8 @@ public class SampleSceneControl : MonoBehaviour
 
     private Button startRecordingButton;
     private Button stopRecordingButton;
+    private Button playRecordingMonoButton;
+    private Button playRecordingAllChannelsButton;
     private VisualElement firstChannelAudioWaveForm;
     private VisualElement secondChannelAudioWaveForm;
     private AudioWaveFormVisualization firstChannelAudioWaveFormVisualization;
@@ -56,19 +61,18 @@ public class SampleSceneControl : MonoBehaviour
         }
         Debug.Log($"Sample rate: {sampleRate}");
 
-        AudioClip recordingAudioClip = PortAudioMicrophone.Start(
+        PortAudioUtils.StartRecording(
             inputDeviceName,
             loop,
             recordingLengthInSeconds,
             sampleRate,
             outputDeviceName,
             directlyPlayRecordedAudioAmplificationFactor);
-        audioSource.clip = recordingAudioClip;
 
         if (!loop)
         {
             Debug.Log($"Will stop recording in {recordingLengthInSeconds} seconds");
-            StartCoroutine(ExecuteAfterDelayInSeconds(recordingLengthInSeconds, () => StopRecordingAndPlayRecordedAudio()));
+            StartCoroutine(ExecuteAfterDelayInSeconds(recordingLengthInSeconds, () => StopRecording()));
         }
 
         InitUi();
@@ -114,26 +118,63 @@ public class SampleSceneControl : MonoBehaviour
         UIDocument uiDocument = FindObjectOfType<UIDocument>();
         startRecordingButton = uiDocument.rootVisualElement.Q<Button>("startRecordingButton");
         stopRecordingButton = uiDocument.rootVisualElement.Q<Button>("stopRecordingButton");
+        playRecordingMonoButton = uiDocument.rootVisualElement.Q<Button>("playRecordingMonoButton");
+        playRecordingAllChannelsButton = uiDocument.rootVisualElement.Q<Button>("playRecordingAllChannelsButton");
         firstChannelAudioWaveForm = uiDocument.rootVisualElement.Q<VisualElement>("firstChannelAudioWaveForm");
         secondChannelAudioWaveForm = uiDocument.rootVisualElement.Q<VisualElement>("secondChannelAudioWaveForm");
 
         startRecordingButton.RegisterCallback<ClickEvent>(evt =>
-            PortAudioMicrophone.Start(inputDeviceName, loop, recordingLengthInSeconds, sampleRate, outputDeviceName, directlyPlayRecordedAudioAmplificationFactor));
-        stopRecordingButton.RegisterCallback<ClickEvent>(evt =>
-        {
-            StopRecordingAndPlayRecordedAudio();
-        });
+            PortAudioUtils.StartRecording(inputDeviceName, loop, recordingLengthInSeconds, sampleRate, outputDeviceName, directlyPlayRecordedAudioAmplificationFactor));
+        stopRecordingButton.RegisterCallback<ClickEvent>(evt => StopRecording());
+        playRecordingMonoButton.RegisterCallback<ClickEvent>(evt => PlayRecordedAudioMono());
+        playRecordingAllChannelsButton.RegisterCallback<ClickEvent>(evt => PlayRecordedAudioAllChannels());
     }
 
-    private void StopRecordingAndPlayRecordedAudio()
+    private void StopRecording()
     {
-        Debug.Log($"StopRecordingAndPlayRecordedAudio");
+        PortAudioUtils.StopRecording(inputDeviceName);
+    }
 
-        PortAudioMicrophone.End(inputDeviceName);
+    private void PlayRecordedAudioAllChannels()
+    {
+        DestroyAudioClips();
 
-        // Play recorded samples using Unity's AudioSource
-        PortAudioUtils.UpdateAudioClipDataWithRecordedSamples(inputDeviceName);
+        allChannelsAudioClip = AudioClip.Create("Microphone Samples AudioClip (all channels)", recordingLengthInSeconds * sampleRate * inputChannelCount, inputChannelCount, sampleRate, false);
+        allChannelsAudioClip.SetData(PortAudioUtils.GetAllRecordedSamples(inputDeviceName), 0);
+
+        audioSource.clip = allChannelsAudioClip;
         audioSource.Play();
+    }
+
+    private void PlayRecordedAudioMono()
+    {
+        DestroyAudioClips();
+
+        monoAudioClip = AudioClip.Create("Microphone Samples AudioClip (mono)", recordingLengthInSeconds * sampleRate, 1, sampleRate, false);
+        monoAudioClip.SetData(PortAudioUtils.GetRecordedSamples(inputDeviceName, inputChannelIndex), 0);
+
+        audioSource.clip = monoAudioClip;
+        audioSource.Play();
+    }
+
+    private void OnDestroy()
+    {
+        DestroyAudioClips();
+    }
+
+    private void DestroyAudioClips()
+    {
+        if (allChannelsAudioClip != null)
+        {
+            Destroy(allChannelsAudioClip);
+            allChannelsAudioClip = null;
+        }
+
+        if (monoAudioClip != null)
+        {
+            Destroy(monoAudioClip);
+            monoAudioClip = null;
+        }
     }
 
     private static IEnumerator ExecuteAfterDelayInSeconds(float delayInSeconds, Action action)
