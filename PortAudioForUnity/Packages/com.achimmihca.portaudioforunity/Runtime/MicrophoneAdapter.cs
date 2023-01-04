@@ -76,7 +76,12 @@ namespace PortAudioForUnity
             }
         }
 
-        public static void GetRecordedSamples(string deviceName, int channelIndex, AudioClip microphoneAudioClip, float[] bufferToBeFilled)
+        public static void GetRecordedSamples(
+            string deviceName,
+            int channelIndex,
+            AudioClip microphoneAudioClip,
+            int recordingPosition,
+            float[] bufferToBeFilled)
         {
             if (UsePortAudio)
             {
@@ -84,7 +89,7 @@ namespace PortAudioForUnity
             }
             else
             {
-                microphoneAudioClip.GetData(bufferToBeFilled, 0);
+                microphoneAudioClip.GetData(bufferToBeFilled, recordingPosition);
             }
         }
 
