@@ -138,8 +138,8 @@ namespace PortAudioForUnity
             bool loop,
             int bufferLengthInSeconds,
             int sampleRate,
-            int inputChannelIndex,
-            string outputDeviceName = null)
+            string outputDeviceName = null,
+            float outputAmplificationFactor = 1)
         {
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
@@ -156,7 +156,7 @@ namespace PortAudioForUnity
                     || existingSampleRecorder.Loop != loop
                     || existingSampleRecorder.SampleBufferLengthInSeconds != bufferLengthInSeconds
                     || existingSampleRecorder.SampleRate != sampleRate
-                    || existingSampleRecorder.InputChannelIndex != inputChannelIndex
+                    || Math.Abs(existingSampleRecorder.OutputAmplificationFactor - outputAmplificationFactor) > 0.001f
                     || existingSampleRecorder.OutputDeviceIndex != outputDeviceIndex)
                 {
                     // Cannot reuse existing sample recorder. Dispose the old one and create a new one.
@@ -183,9 +183,9 @@ namespace PortAudioForUnity
                 inputDeviceName,
                 inputDeviceIndex,
                 maxInputChannelCount,
-                inputChannelIndex,
                 outputDeviceIndex,
                 outputChannelCount,
+                outputAmplificationFactor,
                 sampleRate,
                 SamplesPerBuffer,
                 bufferLengthInSeconds,
@@ -221,20 +221,6 @@ namespace PortAudioForUnity
             }
 
             return false;
-        }
-
-        public static int GetSampleRecorderPosition(string deviceName)
-        {
-            ThrowIfNotOnMainThread();
-            InitializeIfNotDoneYet();
-
-            PortAudioSampleRecorder sampleRecorder = GetSampleRecorderByInputDeviceName(deviceName);
-            if (sampleRecorder != null)
-            {
-                return sampleRecorder.GetPosition();
-            }
-
-            return 0;
         }
 
         private static int GetHostApi() {

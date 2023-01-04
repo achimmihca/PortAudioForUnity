@@ -12,9 +12,9 @@ namespace PortAudioForUnity
 
         public string InputDeviceName { get; private set; }
         public int InputDeviceIndex { get; private set; }
-        public int OutputDeviceIndex  { get; private set; }
         public int InputChannelCount  { get; private set; }
-        public int InputChannelIndex  { get; private set; }
+        public int OutputDeviceIndex  { get; private set; }
+        public float OutputAmplificationFactor { get; private set; }
         public int OutputChannelCount { get; private set; }
         public int SampleRate { get; private set; }
         public uint SamplesPerBuffer { get; private set; }
@@ -23,11 +23,10 @@ namespace PortAudioForUnity
 
         private readonly Audio portAudioSharpAudio;
         private readonly bool playRecordedSamples;
-        private readonly float[] recordedSamples;
-        private readonly float[] allRecordedSamples;
-        private int writeSingleChannelSampleBufferIndex;
-        private int writeAllChannelSampleBufferIndex;
-        private int recordedSampleCountSinceLastCallToGetPosition;
+        private readonly float[] allChannelsRecordedSamples;
+        private int writeAllChannelsSampleBufferIndex;
+        private int singleChannelSampleBufferLength;
+        private int allChannelsSampleBufferLength;
 
         public bool IsRecording { get; private set; }
         private bool isDisposed;
@@ -36,46 +35,45 @@ namespace PortAudioForUnity
             string inputDeviceName,
             int inputDeviceIndex,
             int inputChannelCount,
-            int inputChannelIndex,
             int outputDeviceIndex,
             int outputChannelCount,
+            float outputAmplificationFactor,
             int sampleRate,
             uint samplesPerBuffer,
             int sampleBufferLengthInSeconds,
             bool loop)
         {
-            if (inputChannelCount < 0)
+            if (inputChannelCount <= 0)
             {
-                throw new ArgumentException($"{nameof(inputChannelCount)} cannot be negative");
+                throw new ArgumentException($"{nameof(inputChannelCount)} cannot be negative or zero");
             }
-            if (inputChannelIndex < 0)
+            if (sampleRate <= 0)
             {
-                throw new ArgumentException($"{nameof(inputChannelIndex)} cannot be negative");
+                throw new ArgumentException($"{nameof(sampleRate)} cannot be negative or zero");
             }
-            if (sampleRate < 0)
+            if (sampleBufferLengthInSeconds <= 0)
             {
-                throw new ArgumentException($"{nameof(sampleRate)} cannot be negative");
+                throw new ArgumentException($"{nameof(sampleBufferLengthInSeconds)} cannot be negative or zero");
             }
-            if (sampleBufferLengthInSeconds < 0)
+            if (outputAmplificationFactor <= 0)
             {
-                throw new ArgumentException($"{nameof(sampleBufferLengthInSeconds)} cannot be negative");
+                throw new ArgumentException($"{nameof(outputAmplificationFactor)} cannot be negative or zero. Use a value of 1 to disable output amplification.");
             }
 
             InputDeviceIndex = inputDeviceIndex;
             InputDeviceName = inputDeviceName;
             InputChannelCount = inputChannelCount;
-            InputChannelIndex = inputChannelIndex;
             OutputDeviceIndex = outputDeviceIndex;
             OutputChannelCount = outputChannelCount;
+            OutputAmplificationFactor = outputAmplificationFactor;
             SampleRate = sampleRate;
             SamplesPerBuffer = samplesPerBuffer;
             SampleBufferLengthInSeconds = sampleBufferLengthInSeconds;
             Loop = loop;
             playRecordedSamples = outputDeviceIndex >= 0 && outputChannelCount >= 1;
-            recordedSamples = new float[sampleRate * sampleBufferLengthInSeconds];
-            allRecordedSamples = new float[sampleRate * sampleBufferLengthInSeconds * inputChannelCount];
-
-            Debug.Log($"InputChannelCount: {InputChannelCount}, InputChannelIndex: {InputChannelIndex}, playRecordedSamples: {playRecordedSamples}");
+            singleChannelSampleBufferLength = sampleRate * sampleBufferLengthInSeconds;
+            allChannelsSampleBufferLength = singleChannelSampleBufferLength * inputChannelCount;
+            allChannelsRecordedSamples = new float[allChannelsSampleBufferLength];
 
             portAudioSharpAudio = new Audio(
                 inputDeviceIndex,
@@ -86,15 +84,8 @@ namespace PortAudioForUnity
                 samplesPerBuffer,
                 RecordCallback);
 
-            AudioClip = AudioClip.Create("PortAudioSamplesRecorderAudioClip", allRecordedSamples.Length, InputChannelCount, sampleRate, false);
-            AudioClip.SetData(allRecordedSamples, 0);
-        }
-
-        public int GetPosition()
-        {
-            int position = recordedSampleCountSinceLastCallToGetPosition;
-            recordedSampleCountSinceLastCallToGetPosition = 0;
-            return position;
+            AudioClip = AudioClip.Create("PortAudioSamplesRecorderAudioClip", allChannelsRecordedSamples.Length, InputChannelCount, sampleRate, false);
+            AudioClip.SetData(allChannelsRecordedSamples, 0);
         }
 
         public void Dispose()
@@ -139,56 +130,53 @@ namespace PortAudioForUnity
             // Read samples from pointer to array.
             // The samples are written to the array in the form
             // [SAMPLE_OF_CHANNEL_0, SAMPLE_OF_CHANNEL_1, ..., SAMPLE_OF_CHANNEL_N, SAMPLE_OF_CHANNEL_0, ...]
-            //
+            int writeAllChannelsSampleBufferIndexCopy = writeAllChannelsSampleBufferIndex;
             int inputSampleIndex = 0;
             int outputSampleCount = 0;
+            float monoSampleValue = 0;
             for (int sampleIndex = 0; sampleIndex < samplesPerBufferAsInt; sampleIndex++)
             {
                 for (int channelIndex = 0; channelIndex < InputChannelCount; channelIndex++)
                 {
                     int offsetInArray = inputSampleIndex * sizeof(float);
-                    float sample = Marshal.PtrToStructure<float>(input + offsetInArray);
+                    float sampleValue = Marshal.PtrToStructure<float>(input + offsetInArray);
 
-                    allRecordedSamples[writeAllChannelSampleBufferIndex] = sample;
+                    allChannelsRecordedSamples[writeAllChannelsSampleBufferIndexCopy] = sampleValue;
 
-                    if (channelIndex == InputChannelIndex)
+                    if (playRecordedSamples)
                     {
-                        recordedSamples[writeSingleChannelSampleBufferIndex] = sample;
-
-                        if (playRecordedSamples)
+                        // Playing back the samples is done in mono. Thus, combine the samples to be mono.
+                        monoSampleValue += sampleValue;
+                        if (channelIndex == InputChannelCount - 1)
                         {
+                            monoSampleValue /= InputChannelCount;
+
                             // Write samples to output array. This will play the audio from the speaker.
+                            // Here, the output is assumed to be mono (OutputChannelCount should be 1).
                             int outputOffsetInArray = outputSampleCount * sizeof(float);
-                            Marshal.StructureToPtr<float>(sample, output + outputOffsetInArray, false);
+                            float amplifiedMonoSampleValue = monoSampleValue * OutputAmplificationFactor;
+                            Marshal.StructureToPtr<float>(amplifiedMonoSampleValue, output + outputOffsetInArray, false);
                             outputSampleCount++;
+
+                            monoSampleValue = 0;
                         }
                     }
 
-                    writeAllChannelSampleBufferIndex++;
-                    if (writeAllChannelSampleBufferIndex >= allRecordedSamples.Length)
+                    writeAllChannelsSampleBufferIndexCopy++;
+                    if (writeAllChannelsSampleBufferIndexCopy >= allChannelsRecordedSamples.Length)
                     {
-                        writeAllChannelSampleBufferIndex = 0;
+                        writeAllChannelsSampleBufferIndexCopy = 0;
+                        if (!Loop)
+                        {
+                            return PortAudio.PaStreamCallbackResult.paComplete;
+                        }
                     }
 
                     inputSampleIndex++;
                 }
-
-                writeSingleChannelSampleBufferIndex++;
-                if (writeSingleChannelSampleBufferIndex >= recordedSamples.Length)
-                {
-                    writeSingleChannelSampleBufferIndex = 0;
-                    if (!Loop)
-                    {
-                        return PortAudio.PaStreamCallbackResult.paComplete;
-                    }
-                }
-
-                recordedSampleCountSinceLastCallToGetPosition++;
-                if (recordedSampleCountSinceLastCallToGetPosition >= recordedSamples.Length)
-                {
-                    recordedSampleCountSinceLastCallToGetPosition = recordedSamples.Length - 1;
-                }
             }
+
+            writeAllChannelsSampleBufferIndex = writeAllChannelsSampleBufferIndexCopy;
 
             return PortAudio.PaStreamCallbackResult.paContinue;
         }
@@ -208,11 +196,8 @@ namespace PortAudioForUnity
 
         private void ResetRecordedSamples()
         {
-            Array.Clear(recordedSamples, 0, recordedSamples.Length);
-            Array.Clear(allRecordedSamples, 0, allRecordedSamples.Length);
-            writeAllChannelSampleBufferIndex = 0;
-            writeSingleChannelSampleBufferIndex = 0;
-            recordedSampleCountSinceLastCallToGetPosition = 0;
+            Array.Clear(allChannelsRecordedSamples, 0, allChannelsRecordedSamples.Length);
+            writeAllChannelsSampleBufferIndex = 0;
         }
 
         public void StopRecording()
@@ -229,21 +214,26 @@ namespace PortAudioForUnity
 
         public void UpdateAudioClipDataWithRecordedSamples()
         {
-            AudioClip.SetData(allRecordedSamples, 0);
+            AudioClip.SetData(allChannelsRecordedSamples, 0);
         }
 
         public float[] GetRecordedSamples(int channelIndex)
         {
-            float[] channelSamplesCopy = new float[recordedSamples.Length];
-            int writeSampleIndex = 0;
-            for (int readSampleIndex = channelIndex;
-                readSampleIndex < allRecordedSamples.Length && writeSampleIndex < channelSamplesCopy.Length;
-                readSampleIndex += InputChannelCount)
+            float[] singleChannelSamplesCopy = new float[singleChannelSampleBufferLength];
+            // Start with the last written sample of the channel.
+            int readAllChannelsSampleIndex = writeAllChannelsSampleBufferIndex - InputChannelCount + channelIndex;
+            // Write newer samples to higher index in array, respectively older samples to lower index in array.
+            for (int writeSingleChannelSampleIndex = singleChannelSampleBufferLength - 1; writeSingleChannelSampleIndex >= 0; writeSingleChannelSampleIndex--)
             {
-                channelSamplesCopy[writeSampleIndex] = allRecordedSamples[readSampleIndex];
-                writeSampleIndex++;
+                if (readAllChannelsSampleIndex < 0)
+                {
+                    readAllChannelsSampleIndex += allChannelsRecordedSamples.Length;
+                }
+
+                singleChannelSamplesCopy[writeSingleChannelSampleIndex] = allChannelsRecordedSamples[readAllChannelsSampleIndex];
+                readAllChannelsSampleIndex -= InputChannelCount;
             }
-            return channelSamplesCopy;
+            return singleChannelSamplesCopy;
         }
     }
 }

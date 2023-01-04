@@ -26,10 +26,10 @@ namespace PortAudioForUnity
             bool loop,
             int lengthSec,
             int frequency,
-            int deviceChannel,
-            string outputDeviceName = null)
+            string outputDeviceName = null,
+            float outputAmplificationFactor = 1)
         {
-            return PortAudioUtils.StartRecording(deviceName, loop, lengthSec, frequency, deviceChannel, outputDeviceName);
+            return PortAudioUtils.StartRecording(deviceName, loop, lengthSec, frequency, outputDeviceName, outputAmplificationFactor);
         }
 
         public static void End(string deviceName)
@@ -45,12 +45,6 @@ namespace PortAudioForUnity
         public static bool IsRecording(string deviceName)
         {
             return PortAudioUtils.IsRecording(deviceName);
-        }
-
-        public static int GetPosition(string deviceName)
-        {
-            PortAudioUtils.UpdateAudioClipDataWithRecordedSamples(deviceName);
-            return PortAudioUtils.GetSampleRecorderPosition(deviceName);
         }
     }
 }

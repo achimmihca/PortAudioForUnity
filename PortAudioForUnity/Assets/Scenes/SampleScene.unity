@@ -290,8 +290,9 @@ MonoBehaviour:
   recordingLengthInSeconds: 2
   sampleRate: 0
   inputChannelCount: 0
-  inputChannelIndex: 0
   loop: 1
+  directlyPlayRecordedAudio: 1
+  directlyPlayRecordedAudioAmplificationFactor: 1
 --- !u!4 &1644096720
 Transform:
   m_ObjectHideFlags: 0

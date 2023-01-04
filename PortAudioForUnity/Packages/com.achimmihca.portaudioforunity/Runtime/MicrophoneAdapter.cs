@@ -37,12 +37,11 @@ namespace PortAudioForUnity
             string deviceName,
             bool loop,
             int lengthSec,
-            int frequency,
-            int deviceChannel)
+            int frequency)
         {
             if (UsePortAudio)
             {
-                return PortAudioMicrophone.Start(deviceName, loop, lengthSec, frequency, deviceChannel);
+                return PortAudioMicrophone.Start(deviceName, loop, lengthSec, frequency);
             }
             else
             {
@@ -66,11 +65,26 @@ namespace PortAudioForUnity
         {
             if (UsePortAudio)
             {
-                return PortAudioMicrophone.GetPosition(deviceName);
+                // No equivalent
+                return 0;
             }
             else
             {
                 return Microphone.GetPosition(deviceName);
+            }
+        }
+
+        public static float[] GetRecordedSamples(string deviceName, int channelIndex, AudioClip microphoneAudioClip)
+        {
+            if (UsePortAudio)
+            {
+                return PortAudioUtils.GetRecordedSamples(deviceName, channelIndex);
+            }
+            else
+            {
+                float[] samples = new float[microphoneAudioClip.samples];
+                microphoneAudioClip.GetData(samples, 0);
+                return samples;
             }
         }
 

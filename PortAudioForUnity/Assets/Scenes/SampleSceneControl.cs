@@ -1,8 +1,10 @@
 using System;
 using System.Collections;
+using System.Diagnostics;
 using PortAudioForUnity;
 using UnityEngine;
 using UnityEngine.UIElements;
+using Debug = UnityEngine.Debug;
 
 public class SampleSceneControl : MonoBehaviour
 {
@@ -12,8 +14,9 @@ public class SampleSceneControl : MonoBehaviour
     public int recordingLengthInSeconds = 2;
     public int sampleRate;
     public int inputChannelCount;
-    public int inputChannelIndex;
     public bool loop;
+    public bool directlyPlayRecordedAudio;
+    public float directlyPlayRecordedAudioAmplificationFactor = 1;
 
     private string inputDeviceName;
     private string outputDeviceName;
@@ -27,6 +30,8 @@ public class SampleSceneControl : MonoBehaviour
 
     private float lastUpdateTimeInSeconds;
 
+    private float audioWaveFormRefreshRateTimeInSeconds = 0.2f;
+
     private void Start()
     {
         Application.targetFrameRate = targetFrameRate;
@@ -34,18 +39,14 @@ public class SampleSceneControl : MonoBehaviour
         Debug.Log("Start");
 
         inputDeviceName = PortAudioUtils.GetDefaultInputDeviceName();
-        outputDeviceName = PortAudioUtils.GetDefaultOutputDeviceName();
+        outputDeviceName = directlyPlayRecordedAudio
+            ? PortAudioUtils.GetDefaultOutputDeviceName()
+            : "";
         Debug.Log($"Input device: {inputDeviceName}");
         Debug.Log($"Output device: {outputDeviceName}");
 
         PortAudioUtils.GetInputDeviceCapabilities(inputDeviceName, out int minSampleRate, out int maxSampleRate, out int maxInputChannelCount);
         inputChannelCount = maxInputChannelCount;
-        if (inputChannelIndex > maxInputChannelCount - 1)
-        {
-            inputChannelIndex = maxInputChannelCount - 1;
-        }
-
-        Debug.Log($"Input channel index: {inputChannelIndex}");
 
         Debug.Log($"Loop recording: {loop}");
 
@@ -60,8 +61,8 @@ public class SampleSceneControl : MonoBehaviour
             loop,
             recordingLengthInSeconds,
             sampleRate,
-            inputChannelIndex,
-            outputDeviceName);
+            outputDeviceName,
+            directlyPlayRecordedAudioAmplificationFactor);
         audioSource.clip = recordingAudioClip;
 
         if (!loop)
@@ -87,7 +88,7 @@ public class SampleSceneControl : MonoBehaviour
         }
 
         float currentTimeInSeconds = Time.time;
-        if (currentTimeInSeconds - lastUpdateTimeInSeconds > 0.5f
+        if (currentTimeInSeconds - lastUpdateTimeInSeconds > audioWaveFormRefreshRateTimeInSeconds
             && firstChannelAudioWaveFormVisualization != null
             && secondChannelAudioWaveFormVisualization != null)
         {
@@ -117,7 +118,7 @@ public class SampleSceneControl : MonoBehaviour
         secondChannelAudioWaveForm = uiDocument.rootVisualElement.Q<VisualElement>("secondChannelAudioWaveForm");
 
         startRecordingButton.RegisterCallback<ClickEvent>(evt =>
-            PortAudioMicrophone.Start(inputDeviceName, loop, recordingLengthInSeconds, sampleRate, inputChannelIndex, outputDeviceName));
+            PortAudioMicrophone.Start(inputDeviceName, loop, recordingLengthInSeconds, sampleRate, outputDeviceName, directlyPlayRecordedAudioAmplificationFactor));
         stopRecordingButton.RegisterCallback<ClickEvent>(evt =>
         {
             StopRecordingAndPlayRecordedAudio();
