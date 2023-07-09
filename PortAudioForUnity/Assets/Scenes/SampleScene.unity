@@ -285,11 +285,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 21b622361c7b2c1498a011466502c4e5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  overwriteHostApi: 1
+  hostApi: 13
   targetFrameRate: 30
   audioSource: {fileID: 1644096721}
   recordingLengthInSeconds: 2
   sampleRate: 0
   inputChannelCount: 0
+  inputChannelIndex: 0
   loop: 1
   directlyPlayRecordedAudio: 1
   directlyPlayRecordedAudioAmplificationFactor: 1

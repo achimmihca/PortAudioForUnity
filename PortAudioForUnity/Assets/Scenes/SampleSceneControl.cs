@@ -1,13 +1,17 @@
 using System;
 using System.Collections;
-using System.Diagnostics;
+using System.Collections.Generic;
+using System.Linq;
 using PortAudioForUnity;
+using PortAudioSharp;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Debug = UnityEngine.Debug;
 
 public class SampleSceneControl : MonoBehaviour
 {
+    public bool overwriteHostApi;
+    public PortAudio.PaHostApiTypeId hostApi = PortAudio.PaHostApiTypeId.paInDevelopment;
     public int targetFrameRate = 30;
     public AudioSource audioSource;
     private AudioClip monoAudioClip;
@@ -35,7 +39,7 @@ public class SampleSceneControl : MonoBehaviour
 
     private float lastUpdateTimeInSeconds;
 
-    private float audioWaveFormRefreshRateTimeInSeconds = 0.2f;
+    private float audioWaveFormRefreshRateTimeInSeconds = 0;
 
     private void Start()
     {
@@ -43,6 +47,32 @@ public class SampleSceneControl : MonoBehaviour
 
         Debug.Log("Start");
 
+        List<string> hostApiNames = PortAudioUtils.GetAvailableHostApis()
+            .Select(it => it.ToString())
+            .ToList();
+        Debug.Log($"Available host API count: {PortAudioUtils.GetAvailableHostApiCount()}");
+        Debug.Log($"Available host APIs: {string.Join(", ", hostApiNames)}");
+        Debug.Log($"Default host API index: {PortAudioUtils.GetDefaultHostApiIndex()}");
+
+        foreach (KeyValuePair<PortAudio.PaHostApiTypeId,Dictionary<int,int>> hostEntry in PortAudioUtils.GetHostApiDevices())
+        {
+            foreach (KeyValuePair<int,int> deviceEntry in hostEntry.Value)
+            {
+                PortAudio.PaDeviceInfo deviceInfo = PortAudio.Pa_GetDeviceInfo(deviceEntry.Value);
+                Debug.Log($"Host API: {hostEntry.Key}, host API device index: {deviceEntry.Key}, global device index: {deviceEntry.Value}, name: {deviceInfo.name}, host api index: {deviceInfo.hostApi}, low input latency: {deviceInfo.defaultLowInputLatency}, low output latency: {deviceInfo.defaultLowOutputLatency}, sample rate: {deviceInfo.defaultSampleRate}, input channels: {deviceInfo.maxInputChannels}, , output channels: {deviceInfo.maxOutputChannels}");
+            }
+        }
+
+        if (overwriteHostApi)
+        {
+            Debug.Log($"Using preferred host API {hostApi}");
+            PortAudioUtils.SetHostApi(hostApi);
+        }
+        else
+        {
+            Debug.Log($"Using default host API");
+        }
+        
         inputDeviceName = PortAudioUtils.GetDefaultInputDeviceName();
         outputDeviceName = directlyPlayRecordedAudio
             ? PortAudioUtils.GetDefaultOutputDeviceName()

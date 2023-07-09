@@ -34,6 +34,8 @@ namespace PortAudioForUnity
 
         public static uint SamplesPerBuffer { get; set; } = 1024;
 
+        private static int selectedHostApiAsInt = -1;
+        
         private static bool isInitialized;
         private static bool failedToInitialize;
         private static List<PortAudioSampleRecorder> sampleRecorders = new();
@@ -45,7 +47,7 @@ namespace PortAudioForUnity
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
 
-            int hostApi = GetHostApi();
+            int hostApi = GetHostApiIndexOrThrow();
             PortAudio.PaHostApiInfo hostApiInfo = PortAudio.Pa_GetHostApiInfo(hostApi);
             PortAudio.PaDeviceInfo deviceInfo = PortAudio.Pa_GetDeviceInfo(hostApiInfo.defaultInputDevice);
             return deviceInfo.name;
@@ -56,7 +58,7 @@ namespace PortAudioForUnity
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
 
-            int hostApi = GetHostApi();
+            int hostApi = GetHostApiIndexOrThrow();
             PortAudio.PaHostApiInfo hostApiInfo = PortAudio.Pa_GetHostApiInfo(hostApi);
             PortAudio.PaDeviceInfo deviceInfo = PortAudio.Pa_GetDeviceInfo(hostApiInfo.defaultOutputDevice);
             return deviceInfo.name;
@@ -95,21 +97,11 @@ namespace PortAudioForUnity
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
 
-            int deviceCount = PortAudio.Pa_GetDeviceCount();
-            for (int deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++)
-            {
-                PortAudio.PaDeviceInfo deviceInfo = PortAudio.Pa_GetDeviceInfo(deviceIndex);
-                if (deviceInfo.maxInputChannels > 0
-                    && deviceInfo.name == deviceName)
-                {
-                    minSampleRate = (int)deviceInfo.defaultSampleRate;
-                    maxSampleRate = (int)deviceInfo.defaultSampleRate;
-                    maxChannelCount = deviceInfo.maxInputChannels;
-                    return;
-                }
-            }
-
-            throw new PortAudioException($"No input device found with name {deviceName}");
+            int deviceIndex = GetGlobalInputDeviceIndexOnCurrentHostApiOrThrow(deviceName);
+            PortAudio.PaDeviceInfo deviceInfo = PortAudio.Pa_GetDeviceInfo(deviceIndex);
+            minSampleRate = (int)deviceInfo.defaultSampleRate;
+            maxSampleRate = (int)deviceInfo.defaultSampleRate;
+            maxChannelCount = deviceInfo.maxInputChannels;
         }
 
         public static void GetOutputDeviceCapabilities(string outputDeviceName, out int maxChannelCount)
@@ -117,19 +109,9 @@ namespace PortAudioForUnity
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
 
-            int deviceCount = PortAudio.Pa_GetDeviceCount();
-            for (int deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++)
-            {
-                PortAudio.PaDeviceInfo deviceInfo = PortAudio.Pa_GetDeviceInfo(deviceIndex);
-                if (deviceInfo.maxOutputChannels > 0
-                    && deviceInfo.name == outputDeviceName)
-                {
-                    maxChannelCount = deviceInfo.maxOutputChannels;
-                    return;
-                }
-            }
-
-            throw new PortAudioException($"No output device found with name '{outputDeviceName}'");
+            int deviceIndex = GetGlobalOutputDeviceIndexOnCurrentHostApiOrThrow(outputDeviceName);
+            PortAudio.PaDeviceInfo deviceInfo = PortAudio.Pa_GetDeviceInfo(deviceIndex);
+            maxChannelCount = deviceInfo.maxOutputChannels;
         }
 
         public static void StartRecording(
@@ -143,11 +125,25 @@ namespace PortAudioForUnity
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
 
-            int inputDeviceIndex = GetInputDeviceIndex(inputDeviceName);
+            PortAudio.PaHostApiTypeId hostApi = GetHostApi();
+            
+            int inputDeviceIndex = GetGlobalInputDeviceIndexOnCurrentHostApiOrThrow(inputDeviceName);
             int outputDeviceIndex = string.IsNullOrEmpty(outputDeviceName)
                 ? -1
-                : GetOutputDeviceIndex(outputDeviceName);
+                : GetGlobalOutputDeviceIndexOnCurrentHostApiOrThrow(outputDeviceName);
 
+            if (inputDeviceIndex < 0)
+            {
+                throw new PortAudioException($"Could not determine device index for input device name '{inputDeviceName}' on host API {hostApi}");
+            }
+            
+            if (outputDeviceIndex < 0 && !string.IsNullOrEmpty(outputDeviceName))
+            {
+                throw new PortAudioException($"Could not determine device index for output device name '{outputDeviceName}' on host API {hostApi}");
+            }
+            
+            Log($"Starting recording with global input device index: {inputDeviceIndex} and global output device index: {outputDeviceIndex} on host API {hostApi}");
+            
             PortAudioSampleRecorder existingSampleRecorder = GetSampleRecorderByInputDeviceName(inputDeviceName);
             if (existingSampleRecorder != null)
             {
@@ -220,18 +216,93 @@ namespace PortAudioForUnity
             return false;
         }
 
-        private static int GetHostApi() {
-            int selectedHostApi = PortAudio.Pa_GetDefaultHostApi();
+        public static void SetHostApi(PortAudio.PaHostApiTypeId hostApiTypeId)
+        {
+            if (GetHostApiIndex((int)hostApiTypeId) < 0)
+            {
+                throw new PortAudioException($"Host API {hostApiTypeId} not available.");
+            }
+            
+            selectedHostApiAsInt = (int)hostApiTypeId;
+        }
+
+        public static int GetAvailableHostApiCount()
+        {
+            return PortAudio.Pa_GetHostApiCount();
+        }
+
+        public static int GetDefaultHostApiIndex()
+        {
+            return PortAudio.Pa_GetDefaultHostApi();
+        }
+        
+        public static List<PortAudio.PaHostApiTypeId> GetAvailableHostApis()
+        {
+            List<PortAudio.PaHostApiTypeId> result = new List<PortAudio.PaHostApiTypeId>();
             int apiCount = PortAudio.Pa_GetHostApiCount();
-            for (int i = 0; i<apiCount; i++) {
+            for (int i = 0; i < apiCount; i++) {
                 PortAudio.PaHostApiInfo apiInfo = PortAudio.Pa_GetHostApiInfo(i);
-                if ((apiInfo.type == PortAudio.PaHostApiTypeId.paDirectSound)
-                    || (apiInfo.type == PortAudio.PaHostApiTypeId.paALSA))
+                result.Add(apiInfo.type);
+            }
+            return result;
+        }
+
+        public static Dictionary<PortAudio.PaHostApiTypeId, Dictionary<int, int>> GetHostApiDevices()
+        {
+            Dictionary<PortAudio.PaHostApiTypeId, Dictionary<int, int>> result = new();
+            int apiCount = PortAudio.Pa_GetHostApiCount();
+            for (int hostApiIndex = 0; hostApiIndex < apiCount; hostApiIndex++) 
+            {
+                PortAudio.PaHostApiInfo apiInfo = PortAudio.Pa_GetHostApiInfo(hostApiIndex);
+                
+                Dictionary<int, int> hostApiDeviceIndexToDeviceIndex = new();
+                result[apiInfo.type] = hostApiDeviceIndexToDeviceIndex;
+                
+                for (int hostApiDeviceIndex = 0; hostApiDeviceIndex < apiInfo.deviceCount; hostApiDeviceIndex++)
                 {
-                    selectedHostApi = i;
+                    int deviceIndex = PortAudio.Pa_HostApiDeviceIndexToDeviceIndex(hostApiIndex, hostApiDeviceIndex);
+                    hostApiDeviceIndexToDeviceIndex[hostApiDeviceIndex] = deviceIndex;
                 }
             }
-            return selectedHostApi;
+
+            return result;
+        }
+
+        private static PortAudio.PaHostApiTypeId GetHostApi()
+        {
+            int hostApiIndex = GetHostApiIndexOrThrow();
+            PortAudio.PaHostApiInfo apiInfo = PortAudio.Pa_GetHostApiInfo(hostApiIndex);
+            return apiInfo.type;
+        }
+
+        private static int GetHostApiIndex(int hostApi)
+        {
+            if (hostApi < 0)
+            {
+                return PortAudio.Pa_GetDefaultHostApi();
+            }
+            
+            // Iterate through all available host APIs
+            // and return the first one that matches the preferred host API.
+            int apiCount = PortAudio.Pa_GetHostApiCount();
+            for (int i = 0; i < apiCount; i++) {
+                PortAudio.PaHostApiInfo apiInfo = PortAudio.Pa_GetHostApiInfo(i);
+                if ((int)apiInfo.type == hostApi) {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static int GetHostApiIndexOrThrow()
+        {
+            int hostApiIndex = GetHostApiIndex(selectedHostApiAsInt);
+            if (hostApiIndex < 0)
+            {
+                throw new PortAudioException($"Host API {selectedHostApiAsInt} not found.");
+            }
+            return hostApiIndex;
         }
 
         public static void Dispose()
@@ -246,25 +317,65 @@ namespace PortAudioForUnity
 
         private static PortAudioSampleRecorder GetSampleRecorderByInputDeviceName(string inputDeviceName)
         {
-            int inputDeviceIndex = GetInputDeviceIndex(inputDeviceName);
+            int inputDeviceIndex = GetGlobalInputDeviceIndexOnCurrentHostApiOrThrow(inputDeviceName);
             PortAudioSampleRecorder sampleRecorder = sampleRecorders.FirstOrDefault(sampleRecorder => sampleRecorder.InputDeviceIndex == inputDeviceIndex);
             return sampleRecorder;
         }
 
-        private static int GetInputDeviceIndex(string deviceName)
+        private static int GetGlobalInputDeviceIndexOnCurrentHostApi(string deviceName)
         {
-            int deviceCount = PortAudio.Pa_GetDeviceCount();
-            for (int deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++)
+            Dictionary<PortAudio.PaHostApiTypeId, Dictionary<int,int>> hostApiToDevices = GetHostApiDevices();
+            if (!hostApiToDevices.TryGetValue(GetHostApi(), out Dictionary<int, int> hostApiDevices))
             {
-                PortAudio.PaDeviceInfo deviceInfo = PortAudio.Pa_GetDeviceInfo(deviceIndex);
+                return -1;
+            }
+            
+            foreach (KeyValuePair<int,int> hostApiDevice in hostApiDevices)
+            {
+                int globalDeviceIndex = hostApiDevice.Value;
+                PortAudio.PaDeviceInfo deviceInfo = PortAudio.Pa_GetDeviceInfo(globalDeviceIndex);
                 if (deviceInfo.maxInputChannels > 0
                     && deviceInfo.name == deviceName)
                 {
-                    return deviceIndex;
+                    return globalDeviceIndex;
                 }
             }
 
-            throw new ArgumentException($"No input device found with name {deviceName}");
+            return -1;
+        }
+        
+        private static int GetGlobalOutputDeviceIndexOnCurrentHostApi(string deviceName)
+        {
+            Dictionary<PortAudio.PaHostApiTypeId, Dictionary<int,int>> hostApiToDevices = GetHostApiDevices();
+            if (!hostApiToDevices.TryGetValue(GetHostApi(), out Dictionary<int, int> hostApiDevices))
+            {
+                return -1;
+            }
+            
+            foreach (KeyValuePair<int,int> hostApiDevice in hostApiDevices)
+            {
+                int globalDeviceIndex = hostApiDevice.Value;
+                PortAudio.PaDeviceInfo deviceInfo = PortAudio.Pa_GetDeviceInfo(globalDeviceIndex);
+                if (deviceInfo.maxOutputChannels > 0
+                    && deviceInfo.name == deviceName)
+                {
+                    return globalDeviceIndex;
+                }
+            }
+
+            return -1;
+        }
+        
+        private static int GetGlobalInputDeviceIndexOnCurrentHostApiOrThrow(string deviceName)
+        {
+            int deviceIndex = GetGlobalInputDeviceIndexOnCurrentHostApi(deviceName);
+
+            if (deviceIndex < 0)
+            {
+                throw new ArgumentException($"No input device found with name {deviceName} on host API {GetHostApi()}");
+            }
+
+            return deviceIndex;
         }
 
         /**
@@ -312,20 +423,16 @@ namespace PortAudioForUnity
             return 0;
         }
 
-        private static int GetOutputDeviceIndex(string deviceName)
+        private static int GetGlobalOutputDeviceIndexOnCurrentHostApiOrThrow(string deviceName)
         {
-            int deviceCount = PortAudio.Pa_GetDeviceCount();
-            for (int deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++)
+            int deviceIndex = GetGlobalOutputDeviceIndexOnCurrentHostApi(deviceName);
+
+            if (deviceIndex < 0)
             {
-                PortAudio.PaDeviceInfo deviceInfo = PortAudio.Pa_GetDeviceInfo(deviceIndex);
-                if (deviceInfo.maxOutputChannels > 0
-                    && deviceInfo.name == deviceName)
-                {
-                    return deviceIndex;
-                }
+                throw new ArgumentException($"No output device found with name {deviceName} on host API {GetHostApi()}");
             }
 
-            throw new ArgumentException($"No output device found with name {deviceName}");
+            return deviceIndex;
         }
 
         private static void InitializeIfNotDoneYet()
