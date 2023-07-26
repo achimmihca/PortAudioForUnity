@@ -218,6 +218,8 @@ namespace PortAudioForUnity
 
         public static void SetHostApi(PortAudio.PaHostApiTypeId hostApiTypeId)
         {
+            ThrowIfNotOnMainThread();
+            InitializeIfNotDoneYet();
             if (GetHostApiIndex((int)hostApiTypeId) < 0)
             {
                 throw new PortAudioException($"Host API {hostApiTypeId} not available.");
@@ -228,16 +230,23 @@ namespace PortAudioForUnity
 
         public static int GetAvailableHostApiCount()
         {
+            ThrowIfNotOnMainThread();
+            InitializeIfNotDoneYet();
             return PortAudio.Pa_GetHostApiCount();
         }
 
         public static int GetDefaultHostApiIndex()
         {
+            ThrowIfNotOnMainThread();
+            InitializeIfNotDoneYet();
             return PortAudio.Pa_GetDefaultHostApi();
         }
         
         public static List<PortAudio.PaHostApiTypeId> GetAvailableHostApis()
         {
+            ThrowIfNotOnMainThread();
+            InitializeIfNotDoneYet();
+
             List<PortAudio.PaHostApiTypeId> result = new List<PortAudio.PaHostApiTypeId>();
             int apiCount = PortAudio.Pa_GetHostApiCount();
             for (int i = 0; i < apiCount; i++) {
@@ -249,6 +258,9 @@ namespace PortAudioForUnity
 
         public static Dictionary<PortAudio.PaHostApiTypeId, Dictionary<int, int>> GetHostApiDevices()
         {
+            ThrowIfNotOnMainThread();
+            InitializeIfNotDoneYet();
+
             Dictionary<PortAudio.PaHostApiTypeId, Dictionary<int, int>> result = new();
             int apiCount = PortAudio.Pa_GetHostApiCount();
             for (int hostApiIndex = 0; hostApiIndex < apiCount; hostApiIndex++) 
@@ -310,6 +322,8 @@ namespace PortAudioForUnity
             Log("Dispose");
             sampleRecorders.ForEach(sampleRecorder => sampleRecorder.Dispose());
             sampleRecorders = new();
+
+            PortAudio.Pa_Terminate();
 
             // Wait a short duration such that PortAudio and running recording callbacks have time to shut down properly.
             Thread.Sleep(100);
