@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEngine;
 
 namespace PortAudioForUnity
@@ -6,13 +7,35 @@ namespace PortAudioForUnity
     {
         public static bool UsePortAudio;
 
+        private static int selectedHostApiAsInt = -1;
+
+        public static void SetHostApi(HostApi hostApi)
+        {
+            selectedHostApiAsInt = (int)hostApi;
+        }
+
+        public static HostApi GetHostApi()
+        {
+            if (selectedHostApiAsInt < 0)
+            {
+                return PortAudioUtils.DefaultHostApiInfo.HostApi;
+            }
+            else
+            {
+                return (HostApi)selectedHostApiAsInt;
+            }
+        }
+
         public static string[] Devices
         {
             get
             {
                 if (UsePortAudio)
                 {
-                    return PortAudioUtils.GetInputDeviceNames();
+                    return PortAudioUtils.DeviceInfos
+                        .Where(deviceInfo => deviceInfo.MaxOutputChannels > 0)
+                        .Select(deviceInfo => deviceInfo.Name)
+                        .ToArray();
                 }
                 else
                 {
@@ -25,7 +48,8 @@ namespace PortAudioForUnity
         {
             if (UsePortAudio)
             {
-                return PortAudioUtils.IsRecording(deviceName);
+                DeviceInfo deviceInfo = GetSelectedHostApiDeviceInfo(deviceName);
+                return PortAudioUtils.IsRecording(deviceInfo);
             }
             else
             {
@@ -34,7 +58,7 @@ namespace PortAudioForUnity
         }
 
         public static AudioClip Start(
-            string deviceName,
+            string inputDeviceName,
             bool loop,
             int bufferLengthSec,
             int sampleRate,
@@ -43,12 +67,14 @@ namespace PortAudioForUnity
         {
             if (UsePortAudio)
             {
-                PortAudioUtils.StartRecording(deviceName, loop, bufferLengthSec, sampleRate, outputDeviceName, directOutputAmplificationFactor);
+                DeviceInfo inputDeviceInfo = GetSelectedHostApiDeviceInfo(inputDeviceName);
+                DeviceInfo outputDeviceInfo = GetSelectedHostApiDeviceInfo(outputDeviceName);
+                PortAudioUtils.StartRecording(inputDeviceInfo, loop, bufferLengthSec, sampleRate, outputDeviceInfo, directOutputAmplificationFactor);
                 return null;
             }
             else
             {
-                return Microphone.Start(deviceName, loop, bufferLengthSec, sampleRate);
+                return Microphone.Start(inputDeviceName, loop, bufferLengthSec, sampleRate);
             }
         }
 
@@ -56,7 +82,8 @@ namespace PortAudioForUnity
         {
             if (UsePortAudio)
             {
-                PortAudioUtils.StopRecording(deviceName);
+                DeviceInfo deviceInfo = GetSelectedHostApiDeviceInfo(deviceName);
+                PortAudioUtils.StopRecording(deviceInfo);
             }
             else
             {
@@ -64,11 +91,26 @@ namespace PortAudioForUnity
             }
         }
 
+        private static DeviceInfo GetSelectedHostApiDeviceInfo(string deviceName)
+        {
+            if (string.IsNullOrEmpty(deviceName))
+            {
+                return null;
+            }
+
+            HostApi hostApi = GetHostApi();
+            DeviceInfo deviceInfo = PortAudioUtils.DeviceInfos
+                .FirstOrDefault(deviceInfo => deviceInfo.HostApi == hostApi
+                                              && deviceInfo.Name == deviceName);
+            return deviceInfo;
+        }
+
         public static int GetPosition(string deviceName)
         {
             if (UsePortAudio)
             {
-                return PortAudioUtils.GetSingleChannelRecordingPosition(deviceName);
+                DeviceInfo deviceInfo = GetSelectedHostApiDeviceInfo(deviceName);
+                return PortAudioUtils.GetSingleChannelRecordingPosition(deviceInfo);
             }
             else
             {
@@ -85,7 +127,8 @@ namespace PortAudioForUnity
         {
             if (UsePortAudio)
             {
-                PortAudioUtils.GetRecordedSamples(deviceName, channelIndex, bufferToBeFilled);
+                DeviceInfo deviceInfo = GetSelectedHostApiDeviceInfo(deviceName);
+                PortAudioUtils.GetRecordedSamples(deviceInfo, channelIndex, bufferToBeFilled);
             }
             else
             {
@@ -101,7 +144,10 @@ namespace PortAudioForUnity
         {
             if (UsePortAudio)
             {
-                PortAudioUtils.GetInputDeviceCapabilities(deviceName, out minFreq, out maxFreq, out channelCount);
+                DeviceInfo deviceInfo = GetSelectedHostApiDeviceInfo(deviceName);
+                minFreq = (int)deviceInfo.DefaultSampleRate;
+                maxFreq = (int)deviceInfo.DefaultSampleRate;
+                channelCount = deviceInfo.MaxInputChannels;
             }
             else
             {
