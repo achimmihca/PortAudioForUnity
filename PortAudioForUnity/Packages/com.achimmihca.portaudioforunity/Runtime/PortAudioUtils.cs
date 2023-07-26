@@ -40,6 +40,10 @@ namespace PortAudioForUnity
 
         private static GameObject portAudioDisposeOnDestroyGameObject;
 
+        public static List<HostApi> HostApis => HostApiInfos
+            .Select(hostApiInfo => hostApiInfo.HostApi)
+            .ToList();
+
         private static List<HostApiInfo> hostApiInfos;
         public static List<HostApiInfo> HostApiInfos
         {
@@ -98,8 +102,8 @@ namespace PortAudioForUnity
         }
 
         public static HostApiInfo DefaultHostApiInfo => GetHostApiInfo(DefaultHostApi);
-        public static DeviceInfo DefaultInputDeviceInfo = GetDeviceInfo(DefaultHostApi, DefaultHostApiInfo.DefaultInputDevice);
-        public static DeviceInfo DefaultOutputDeviceInfo = GetDeviceInfo(DefaultHostApi, DefaultHostApiInfo.DefaultOutputDevice);
+        public static DeviceInfo DefaultInputDeviceInfo => GetDeviceInfo(DefaultHostApiInfo.DefaultInputDeviceGlobalIndex);
+        public static DeviceInfo DefaultOutputDeviceInfo => GetDeviceInfo(DefaultHostApiInfo.DefaultOutputDeviceGlobalIndex);
 
         public static void StartRecording(
             DeviceInfo inputDeviceInfo,
@@ -118,7 +122,6 @@ namespace PortAudioForUnity
             }
 
             Log($"Starting recording with input device: {inputDeviceInfo} and output device: {outputDeviceInfo}");
-
 
             int globalOutputDeviceIndex = outputDeviceInfo?.GlobalDeviceIndex ?? -1;
             if (globalDeviceIndexToSampleRecorder.TryGetValue(inputDeviceInfo.GlobalDeviceIndex, out PortAudioSampleRecorder existingSampleRecorder)
@@ -223,6 +226,11 @@ namespace PortAudioForUnity
             }
 
             return result;
+        }
+
+        public static DeviceInfo GetDeviceInfo(int globalDeviceIndex)
+        {
+            return DeviceInfos.FirstOrDefault(deviceInfo => deviceInfo.GlobalDeviceIndex == globalDeviceIndex);
         }
 
         public static DeviceInfo GetDeviceInfo(HostApi hostApi, int hostApiDeviceIndex)
