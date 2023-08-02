@@ -6,12 +6,14 @@ namespace PortAudioForUnity
 {
     internal class PortAudioSampleRecorder : IDisposable
     {
-        public string InputDeviceName { get; private set; }
-        public int InputDeviceIndex { get; private set; }
-        public int InputChannelCount  { get; private set; }
-        public int OutputDeviceIndex  { get; private set; }
+        private DeviceInfo InputDeviceInfo { get; set; }
+        public int GlobalInputDeviceIndex => InputDeviceInfo?.GlobalDeviceIndex ?? -1;
+        public int InputChannelCount => InputDeviceInfo?.MaxInputChannels ?? 0;
+
+        private DeviceInfo OutputDeviceInfo { get; set; }
+        public int GlobalOutputDeviceIndex => OutputDeviceInfo?.GlobalDeviceIndex ?? -1;
+
         public float OutputAmplificationFactor { get; private set; }
-        public int OutputChannelCount { get; private set; }
         public int SampleRate { get; private set; }
         public uint SamplesPerBuffer { get; private set; }
         public int SampleBufferLengthInSeconds { get; private set; }
@@ -28,20 +30,21 @@ namespace PortAudioForUnity
         private bool isDisposed;
 
         internal PortAudioSampleRecorder(
-            string inputDeviceName,
-            int inputDeviceIndex,
-            int inputChannelCount,
-            int outputDeviceIndex,
-            int outputChannelCount,
+            DeviceInfo inputDeviceInfo,
+            DeviceInfo outputDeviceInfo,
             float outputAmplificationFactor,
             int sampleRate,
             uint samplesPerBuffer,
             int sampleBufferLengthInSeconds,
             bool loop)
         {
-            if (inputChannelCount <= 0)
+            if (inputDeviceInfo == null)
             {
-                throw new ArgumentException($"{nameof(inputChannelCount)} cannot be negative or zero");
+                throw new NullReferenceException(nameof(inputDeviceInfo));
+            }
+            if (inputDeviceInfo.MaxInputChannels <= 0)
+            {
+                throw new ArgumentException($"No input channels in {inputDeviceInfo} cannot be negative or zero");
             }
             if (sampleRate <= 0)
             {
@@ -56,25 +59,28 @@ namespace PortAudioForUnity
                 throw new ArgumentException($"{nameof(outputAmplificationFactor)} cannot be negative or zero. Use a value of 1 to disable output amplification.");
             }
 
-            InputDeviceIndex = inputDeviceIndex;
-            InputDeviceName = inputDeviceName;
-            InputChannelCount = inputChannelCount;
-            OutputDeviceIndex = outputDeviceIndex;
-            OutputChannelCount = outputChannelCount;
+            InputDeviceInfo = inputDeviceInfo;
+            OutputDeviceInfo = outputDeviceInfo;
             OutputAmplificationFactor = outputAmplificationFactor;
             SampleRate = sampleRate;
             SamplesPerBuffer = samplesPerBuffer;
             SampleBufferLengthInSeconds = sampleBufferLengthInSeconds;
             Loop = loop;
-            playRecordedSamples = outputDeviceIndex >= 0 && outputChannelCount >= 1;
+            playRecordedSamples = outputDeviceInfo != null && outputDeviceInfo.MaxOutputChannels >= 1;
             singleChannelSampleBufferLength = sampleRate * sampleBufferLengthInSeconds;
-            allChannelsSampleBufferLength = singleChannelSampleBufferLength * inputChannelCount;
+            allChannelsSampleBufferLength = singleChannelSampleBufferLength * inputDeviceInfo.MaxInputChannels;
             allChannelsRecordedSamples = new float[allChannelsSampleBufferLength];
 
+            // Recording is always done in mono from one of the input device's channels.
+            // Thus, the output is also mono (i.e., output channel count is 1).
+            int outputChannelCount = outputDeviceInfo == null
+                ? -1
+                : 1;
+
             portAudioSharpAudio = new Audio(
-                inputDeviceIndex,
-                outputDeviceIndex,
-                inputChannelCount,
+                InputDeviceInfo?.GlobalDeviceIndex ?? -1,
+                OutputDeviceInfo?.GlobalDeviceIndex ?? -1,
+                InputChannelCount,
                 outputChannelCount,
                 sampleRate,
                 samplesPerBuffer,

@@ -1,14 +1,20 @@
 using System;
 using System.Collections;
-using System.Diagnostics;
+using System.Collections.Generic;
+using System.Linq;
 using PortAudioForUnity;
+using PortAudioSharp;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Debug = UnityEngine.Debug;
 
 public class SampleSceneControl : MonoBehaviour
 {
+    public bool overwriteHostApi;
+    public HostApi hostApi = HostApi.WASAPI;
     public int targetFrameRate = 30;
+    public float audioWaveFormRefreshRateTimeInSeconds;
+
     public AudioSource audioSource;
     private AudioClip monoAudioClip;
     private AudioClip allChannelsAudioClip;
@@ -35,7 +41,9 @@ public class SampleSceneControl : MonoBehaviour
 
     private float lastUpdateTimeInSeconds;
 
-    private float audioWaveFormRefreshRateTimeInSeconds = 0.2f;
+    private HostApiInfo HostApiInfo => PortAudioUtils.GetHostApiInfo(MicrophoneAdapter.GetHostApi());
+    private DeviceInfo InputDeviceInfo => PortAudioUtils.GetDeviceInfo(HostApiInfo.DefaultInputDeviceGlobalIndex);
+    private DeviceInfo OutputDeviceInfo => PortAudioUtils.GetDeviceInfo(HostApiInfo.DefaultOutputDeviceGlobalIndex);
 
     private void Start()
     {
@@ -43,30 +51,64 @@ public class SampleSceneControl : MonoBehaviour
 
         Debug.Log("Start");
 
-        inputDeviceName = PortAudioUtils.GetDefaultInputDeviceName();
+        string hostApiNameCsv = string.Join(", ", PortAudioUtils.HostApiInfos
+            .Select(hostApiInfo => $"'{hostApiInfo.Name}' ({hostApiInfo.HostApi})"));
+        Debug.Log($"Available host APIs: {hostApiNameCsv}");
+        Debug.Log($"Default host API: {PortAudioUtils.DefaultHostApiInfo.HostApi}");
+
+        Debug.Log(">>> Host API infos <<<");
+        foreach (HostApiInfo hostApiInfo in PortAudioUtils.HostApiInfos)
+        {
+            Debug.Log($"Host API: {hostApiInfo.HostApi}," +
+                      $" name: {hostApiInfo.Name}," +
+                      $" device count: {hostApiInfo.DeviceCount}," +
+                      $" default global input device index: {hostApiInfo.DefaultInputDeviceGlobalIndex}," +
+                      $" default global output device index: {hostApiInfo.DefaultOutputDeviceGlobalIndex}");
+        }
+
+        Debug.Log(">>> Device infos <<<");
+        foreach (DeviceInfo deviceInfo in PortAudioUtils.DeviceInfos)
+        {
+            Debug.Log($"Device: '{deviceInfo.Name}'," +
+                      $" Host API: {deviceInfo.HostApi}," +
+                      $" host API device index: {deviceInfo.HostApiDeviceIndex}," +
+                      $" global device index: {deviceInfo.GlobalDeviceIndex}," +
+                      $" low input latency: {deviceInfo.DefaultLowInputLatency}," +
+                      $" low output latency: {deviceInfo.DefaultLowOutputLatency}," +
+                      $" sample rate: {deviceInfo.DefaultSampleRate}," +
+                      $" input channels: {deviceInfo.MaxInputChannels}, " +
+                      $" output channels: {deviceInfo.MaxOutputChannels}");
+        }
+
+        if (overwriteHostApi)
+        {
+            MicrophoneAdapter.SetHostApi(hostApi);
+        }
+        Debug.Log($"Using host API: {MicrophoneAdapter.GetHostApi()}");
+
+        inputDeviceName = InputDeviceInfo.Name;
         outputDeviceName = directlyPlayRecordedAudio
-            ? PortAudioUtils.GetDefaultOutputDeviceName()
+            ? PortAudioUtils.DefaultOutputDeviceInfo.Name
             : "";
         Debug.Log($"Input device: {inputDeviceName}");
         Debug.Log($"Output device: {outputDeviceName}");
 
-        PortAudioUtils.GetInputDeviceCapabilities(inputDeviceName, out int minSampleRate, out int maxSampleRate, out int maxInputChannelCount);
-        inputChannelCount = maxInputChannelCount;
+        inputChannelCount = PortAudioUtils.DefaultInputDeviceInfo.MaxInputChannels;
 
         Debug.Log($"Loop recording: {loop}");
 
         if (sampleRate <= 0)
         {
-            sampleRate = maxSampleRate;
+            sampleRate = (int)InputDeviceInfo.DefaultSampleRate;
         }
         Debug.Log($"Sample rate: {sampleRate}");
 
         PortAudioUtils.StartRecording(
-            inputDeviceName,
+            InputDeviceInfo,
             loop,
             recordingLengthInSeconds,
             sampleRate,
-            outputDeviceName,
+            OutputDeviceInfo,
             directlyPlayRecordedAudioAmplificationFactor);
 
         if (!loop)
@@ -104,13 +146,13 @@ public class SampleSceneControl : MonoBehaviour
     private void UpdateAudioWaveForm()
     {
         float[] firstChannelSamples = new float[sampleRate * recordingLengthInSeconds];
-        PortAudioUtils.GetRecordedSamples(inputDeviceName, 0, firstChannelSamples);
+        PortAudioUtils.GetRecordedSamples(InputDeviceInfo, 0, firstChannelSamples);
         firstChannelAudioWaveFormVisualization.DrawWaveFormMinAndMaxValues(firstChannelSamples);
 
         if (inputChannelCount > 1)
         {
             float[] secondChannelSamples = new float[sampleRate * recordingLengthInSeconds];
-            PortAudioUtils.GetRecordedSamples(inputDeviceName, 1, secondChannelSamples);
+            PortAudioUtils.GetRecordedSamples(InputDeviceInfo, 1, secondChannelSamples);
             secondChannelAudioWaveFormVisualization.DrawWaveFormMinAndMaxValues(secondChannelSamples);
         }
     }
@@ -126,7 +168,7 @@ public class SampleSceneControl : MonoBehaviour
         secondChannelAudioWaveForm = uiDocument.rootVisualElement.Q<VisualElement>("secondChannelAudioWaveForm");
 
         startRecordingButton.RegisterCallback<ClickEvent>(evt =>
-            PortAudioUtils.StartRecording(inputDeviceName, loop, recordingLengthInSeconds, sampleRate, outputDeviceName, directlyPlayRecordedAudioAmplificationFactor));
+            PortAudioUtils.StartRecording(InputDeviceInfo, loop, recordingLengthInSeconds, sampleRate, PortAudioUtils.DefaultOutputDeviceInfo, directlyPlayRecordedAudioAmplificationFactor));
         stopRecordingButton.RegisterCallback<ClickEvent>(evt => StopRecording());
         playRecordingMonoButton.RegisterCallback<ClickEvent>(evt => PlayRecordedAudioMono());
         playRecordingAllChannelsButton.RegisterCallback<ClickEvent>(evt => PlayRecordedAudioAllChannels());
@@ -134,7 +176,7 @@ public class SampleSceneControl : MonoBehaviour
 
     private void StopRecording()
     {
-        PortAudioUtils.StopRecording(inputDeviceName);
+        PortAudioUtils.StopRecording(InputDeviceInfo);
     }
 
     private void PlayRecordedAudioAllChannels()
@@ -142,7 +184,7 @@ public class SampleSceneControl : MonoBehaviour
         DestroyAudioClips();
 
         float[] allChannelsSamples = new float[sampleRate * recordingLengthInSeconds * inputChannelCount];
-        PortAudioUtils.GetAllRecordedSamples(inputDeviceName, allChannelsSamples);
+        PortAudioUtils.GetAllRecordedSamples(InputDeviceInfo, allChannelsSamples);
         allChannelsAudioClip = AudioClip.Create("Microphone Samples AudioClip (all channels)", recordingLengthInSeconds * sampleRate * inputChannelCount, inputChannelCount, sampleRate, false);
         allChannelsAudioClip.SetData(allChannelsSamples, 0);
 
@@ -155,7 +197,7 @@ public class SampleSceneControl : MonoBehaviour
         DestroyAudioClips();
 
         float[] singleChannelSamples = new float[sampleRate * recordingLengthInSeconds];
-        PortAudioUtils.GetRecordedSamples(inputDeviceName, inputChannelIndex, singleChannelSamples);
+        PortAudioUtils.GetRecordedSamples(InputDeviceInfo, inputChannelIndex, singleChannelSamples);
         monoAudioClip = AudioClip.Create("Microphone Samples AudioClip (mono)", recordingLengthInSeconds * sampleRate, 1, sampleRate, false);
         monoAudioClip.SetData(singleChannelSamples, 0);
 
