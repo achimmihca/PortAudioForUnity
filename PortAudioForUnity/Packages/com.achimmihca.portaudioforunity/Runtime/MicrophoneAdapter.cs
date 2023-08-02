@@ -33,7 +33,8 @@ namespace PortAudioForUnity
                 if (UsePortAudio)
                 {
                     return PortAudioUtils.DeviceInfos
-                        .Where(deviceInfo => deviceInfo.MaxOutputChannels > 0)
+                        .Where(deviceInfo => deviceInfo.HostApi == GetHostApi()
+                                             && deviceInfo.MaxInputChannels > 0)
                         .Select(deviceInfo => deviceInfo.Name)
                         .ToArray();
                 }
