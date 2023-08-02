@@ -346,7 +346,7 @@ namespace PortAudioForUnity
             return true;
         }
 
-        private static void Log(string message, LogType logType = LogType.Log)
+        internal static void Log(string message, LogType logType = LogType.Log)
         {
             Debug.LogFormat(logType, LogOption.None, null, $"PortAudioForUnity - {message}");
         }

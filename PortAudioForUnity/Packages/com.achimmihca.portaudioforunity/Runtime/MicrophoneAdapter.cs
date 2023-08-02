@@ -106,6 +106,7 @@ namespace PortAudioForUnity
         {
             if (string.IsNullOrEmpty(deviceName))
             {
+                PortAudioUtils.Log($"Input device name is null", LogType.Warning);
                 deviceInfo = null;
                 return false;
             }
@@ -114,6 +115,10 @@ namespace PortAudioForUnity
             deviceInfo = PortAudioUtils.DeviceInfos
                 .FirstOrDefault(deviceInfo => deviceInfo.HostApi == hostApi
                                               && deviceInfo.Name == deviceName);
+            if (deviceInfo == null)
+            {
+                PortAudioUtils.Log($"Input device '{deviceInfo.Name}' not found in host API '{hostApi}'", LogType.Warning);
+            }
             return deviceInfo != null;
         }
 
