@@ -74,9 +74,21 @@ namespace PortAudioForUnity
         {
             if (UsePortAudio)
             {
-                if (TryGetSelectedHostApiDeviceInfo(inputDeviceName, out DeviceInfo inputDeviceInfo)
-                    && TryGetSelectedHostApiDeviceInfo(outputDeviceName, out DeviceInfo outputDeviceInfo))
+                if (TryGetSelectedHostApiDeviceInfo(inputDeviceName, out DeviceInfo inputDeviceInfo))
                 {
+                    DeviceInfo outputDeviceInfo;
+                    if (string.IsNullOrEmpty(outputDeviceName))
+                    {
+                        outputDeviceInfo = null;
+                    }
+                    else
+                    {
+                        if (!TryGetSelectedHostApiDeviceInfo(outputDeviceName, out outputDeviceInfo))
+                        {
+                            return null;
+                        }
+                    }
+
                     PortAudioUtils.StartRecording(inputDeviceInfo, loop, bufferLengthSec, sampleRate, outputDeviceInfo, directOutputAmplificationFactor);
                 }
                 return null;
