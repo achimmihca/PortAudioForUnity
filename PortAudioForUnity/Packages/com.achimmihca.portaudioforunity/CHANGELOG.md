@@ -6,5 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.0.0]
+- select host API
+- dedicated PortAudioForUnity data structures
+
 ## [v1.0.0]
 - initial release
