@@ -1,20 +1,21 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.UIElements;
 
-public class AudioWaveFormVisualization
+public class AudioWaveFormVisualization : IDisposable
 {
     public Color WaveformColor { get; set; } = Color.white;
 
     private readonly DynamicTexture dynTexture;
 
-    public AudioWaveFormVisualization(GameObject gameObject, VisualElement visualElement)
+    public AudioWaveFormVisualization(GameObject gameObject, VisualElement visualElement, int textureWidth = -1, int textureHeight = -1)
     {
-        dynTexture = new DynamicTexture(gameObject, visualElement);
+        dynTexture = new DynamicTexture(gameObject, visualElement, textureWidth, textureHeight);
     }
 
-    public void Destroy()
+    public void SetTextureSize(int width, int height)
     {
-        dynTexture.Destroy();
+        dynTexture.Init(width, height);
     }
 
     public void DrawWaveFormMinAndMaxValues(AudioClip audioClip)
@@ -166,5 +167,10 @@ public class AudioWaveFormVisualization
 
         // upload to the graphics card 
         dynTexture.ApplyTexture();
+    }
+
+    public void Dispose()
+    {
+        dynTexture.Dispose();
     }
 }

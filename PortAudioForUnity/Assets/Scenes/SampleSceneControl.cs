@@ -129,8 +129,10 @@ public class SampleSceneControl : MonoBehaviour
             && !float.IsNaN(firstChannelAudioWaveForm.resolvedStyle.width)
             && !float.IsNaN(firstChannelAudioWaveForm.resolvedStyle.height))
         {
-            firstChannelAudioWaveFormVisualization = new AudioWaveFormVisualization(gameObject, firstChannelAudioWaveForm);
-            secondChannelAudioWaveFormVisualization = new AudioWaveFormVisualization(gameObject, secondChannelAudioWaveForm);
+            int textureWidth = 200;
+            int textureHeight = 100;
+            firstChannelAudioWaveFormVisualization = new AudioWaveFormVisualization(gameObject, firstChannelAudioWaveForm, textureWidth, textureHeight);
+            secondChannelAudioWaveFormVisualization = new AudioWaveFormVisualization(gameObject, secondChannelAudioWaveForm, textureWidth, textureHeight);
         }
 
         float currentTimeInSeconds = Time.time;
@@ -208,6 +210,8 @@ public class SampleSceneControl : MonoBehaviour
     private void OnDestroy()
     {
         DestroyAudioClips();
+        firstChannelAudioWaveFormVisualization?.Dispose();
+        secondChannelAudioWaveFormVisualization?.Dispose();
     }
 
     private void DestroyAudioClips()
