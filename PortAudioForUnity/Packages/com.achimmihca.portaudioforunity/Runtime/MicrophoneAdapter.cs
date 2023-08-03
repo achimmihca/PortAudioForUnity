@@ -9,6 +9,28 @@ namespace PortAudioForUnity
 
         private static int selectedHostApiAsInt = -1;
 
+        public static DeviceInfo DefaultInputDeviceInfo
+        {
+            get
+            {
+                HostApiInfo hostApiInfo = GetHostApiInfo();
+                return hostApiInfo == null
+                    ? null
+                    : PortAudioUtils.GetDeviceInfo(hostApiInfo.DefaultInputDeviceGlobalIndex);
+            }
+        }
+
+        public static DeviceInfo DefaultOutputDeviceInfo
+        {
+            get
+            {
+                HostApiInfo hostApiInfo = GetHostApiInfo();
+                return hostApiInfo == null
+                    ? null
+                    : PortAudioUtils.GetDeviceInfo(hostApiInfo.DefaultOutputDeviceGlobalIndex);
+            }
+        }
+
         public static void SetHostApi(HostApi hostApi)
         {
             selectedHostApiAsInt = (int)hostApi;
@@ -24,6 +46,11 @@ namespace PortAudioForUnity
             {
                 return (HostApi)selectedHostApiAsInt;
             }
+        }
+
+        public static HostApiInfo GetHostApiInfo()
+        {
+            return PortAudioUtils.GetHostApiInfo(GetHostApi());
         }
 
         public static string[] Devices
@@ -85,7 +112,7 @@ namespace PortAudioForUnity
                     {
                         if (!TryGetSelectedHostApiDeviceInfo(outputDeviceName, out outputDeviceInfo))
                         {
-                            return null;
+                            PortAudioUtils.Log($"Starting recording without output device because output device '{outputDeviceName}' not found in host API {GetHostApi()}", LogType.Warning);
                         }
                     }
 
