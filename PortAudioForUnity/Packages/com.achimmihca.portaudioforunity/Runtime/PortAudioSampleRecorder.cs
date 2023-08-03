@@ -13,7 +13,7 @@ namespace PortAudioForUnity
         private DeviceInfo OutputDeviceInfo { get; set; }
         public int GlobalOutputDeviceIndex => OutputDeviceInfo?.GlobalDeviceIndex ?? -1;
 
-        public float OutputAmplificationFactor { get; private set; }
+        public float OutputAmplificationFactor { get; set; }
         public int SampleRate { get; private set; }
         public uint SamplesPerBuffer { get; private set; }
         public int SampleBufferLengthInSeconds { get; private set; }
@@ -53,10 +53,6 @@ namespace PortAudioForUnity
             if (sampleBufferLengthInSeconds <= 0)
             {
                 throw new ArgumentException($"{nameof(sampleBufferLengthInSeconds)} cannot be negative or zero");
-            }
-            if (outputAmplificationFactor <= 0)
-            {
-                throw new ArgumentException($"{nameof(outputAmplificationFactor)} cannot be negative or zero. Use a value of 1 to disable output amplification.");
             }
 
             InputDeviceInfo = inputDeviceInfo;

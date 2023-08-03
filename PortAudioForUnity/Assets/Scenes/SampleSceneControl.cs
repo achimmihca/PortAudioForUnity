@@ -5,6 +5,7 @@ using System.Linq;
 using PortAudioForUnity;
 using PortAudioSharp;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UIElements;
 using Debug = UnityEngine.Debug;
 
@@ -24,8 +25,8 @@ public class SampleSceneControl : MonoBehaviour
     public int inputChannelCount;
     public int inputChannelIndex;
     public bool loop;
-    public bool directlyPlayRecordedAudio;
-    public float directlyPlayRecordedAudioAmplificationFactor = 1;
+    public bool playRecordedAudio;
+    public float playRecordedAudioAmplificationFactor = 1;
 
     private string inputDeviceName;
     private string outputDeviceName;
@@ -87,7 +88,7 @@ public class SampleSceneControl : MonoBehaviour
         Debug.Log($"Using host API: {MicrophoneAdapter.GetHostApi()}");
 
         inputDeviceName = InputDeviceInfo.Name;
-        outputDeviceName = directlyPlayRecordedAudio
+        outputDeviceName = playRecordedAudio
             ? PortAudioUtils.DefaultOutputDeviceInfo.Name
             : "";
         Debug.Log($"Input device: {inputDeviceName}");
@@ -109,7 +110,7 @@ public class SampleSceneControl : MonoBehaviour
             recordingLengthInSeconds,
             sampleRate,
             OutputDeviceInfo,
-            directlyPlayRecordedAudioAmplificationFactor);
+            playRecordedAudioAmplificationFactor);
 
         if (!loop)
         {
@@ -143,6 +144,8 @@ public class SampleSceneControl : MonoBehaviour
             UpdateAudioWaveForm();
             lastUpdateTimeInSeconds = currentTimeInSeconds;
         }
+
+        PortAudioUtils.SetOutputAmplificationFactor(InputDeviceInfo, playRecordedAudioAmplificationFactor);
     }
 
     private void UpdateAudioWaveForm()
@@ -170,7 +173,7 @@ public class SampleSceneControl : MonoBehaviour
         secondChannelAudioWaveForm = uiDocument.rootVisualElement.Q<VisualElement>("secondChannelAudioWaveForm");
 
         startRecordingButton.RegisterCallback<ClickEvent>(evt =>
-            PortAudioUtils.StartRecording(InputDeviceInfo, loop, recordingLengthInSeconds, sampleRate, PortAudioUtils.DefaultOutputDeviceInfo, directlyPlayRecordedAudioAmplificationFactor));
+        PortAudioUtils.StartRecording(InputDeviceInfo, loop, recordingLengthInSeconds, sampleRate, OutputDeviceInfo, playRecordedAudioAmplificationFactor));
         stopRecordingButton.RegisterCallback<ClickEvent>(evt => StopRecording());
         playRecordingMonoButton.RegisterCallback<ClickEvent>(evt => PlayRecordedAudioMono());
         playRecordingAllChannelsButton.RegisterCallback<ClickEvent>(evt => PlayRecordedAudioAllChannels());

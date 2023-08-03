@@ -158,6 +158,18 @@ namespace PortAudioForUnity
             newSampleRecorder.StartRecording();
         }
 
+        public static void SetOutputAmplificationFactor(DeviceInfo deviceInfo, float outputAmplificationFactor)
+        {
+            ThrowIfNotOnMainThread();
+            InitializeIfNotDoneYet();
+
+            if (globalDeviceIndexToSampleRecorder.TryGetValue(deviceInfo.GlobalDeviceIndex, out PortAudioSampleRecorder sampleRecorder)
+                && sampleRecorder != null)
+            {
+                sampleRecorder.OutputAmplificationFactor = outputAmplificationFactor;
+            }
+        }
+
         public static void StopRecording(DeviceInfo deviceInfo)
         {
             ThrowIfNotOnMainThread();
