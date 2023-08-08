@@ -171,7 +171,7 @@ namespace PortAudioForUnity
                 throw new NullReferenceException(nameof(outputDeviceInfo));
             }
 
-            Log($"Starting payback with output device: {outputDeviceInfo}");
+            Log($"Starting playback with output device: {outputDeviceInfo}");
 
             if (globalDeviceIndexToOutputDeviceControl.TryGetValue(outputDeviceInfo.GlobalDeviceIndex, out OutputDeviceControl existingOutputDeviceControl)
                 && existingOutputDeviceControl != null)
