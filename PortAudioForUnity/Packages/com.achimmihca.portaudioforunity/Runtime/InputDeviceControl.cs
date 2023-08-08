@@ -4,32 +4,18 @@ using PortAudioSharp;
 
 namespace PortAudioForUnity
 {
-    internal class PortAudioSampleRecorder : IDisposable
+    internal class InputDeviceControl : AbstractInputOutputDeviceControl
     {
-        private DeviceInfo InputDeviceInfo { get; set; }
-        public int GlobalInputDeviceIndex => InputDeviceInfo?.GlobalDeviceIndex ?? -1;
-        public int InputChannelCount => InputDeviceInfo?.MaxInputChannels ?? 0;
-
-        private DeviceInfo OutputDeviceInfo { get; set; }
-        public int GlobalOutputDeviceIndex => OutputDeviceInfo?.GlobalDeviceIndex ?? -1;
-
         public float OutputAmplificationFactor { get; set; }
-        public int SampleRate { get; private set; }
-        public uint SamplesPerBuffer { get; private set; }
-        public int SampleBufferLengthInSeconds { get; private set; }
         public bool Loop { get; private set; }
 
-        private readonly Audio portAudioSharpAudio;
         private readonly bool playRecordedSamples;
         private readonly float[] allChannelsRecordedSamples;
         private int writeAllChannelsSampleBufferIndex;
-        private int singleChannelSampleBufferLength;
-        private int allChannelsSampleBufferLength;
 
-        public bool IsRecording { get; private set; }
-        private bool isDisposed;
+        public bool IsRecording => IsAudioStreamStarted;
 
-        internal PortAudioSampleRecorder(
+        internal InputDeviceControl(
             DeviceInfo inputDeviceInfo,
             DeviceInfo outputDeviceInfo,
             float outputAmplificationFactor,
@@ -37,6 +23,15 @@ namespace PortAudioForUnity
             uint samplesPerBuffer,
             int sampleBufferLengthInSeconds,
             bool loop)
+            : base(inputDeviceInfo,
+                inputDeviceInfo.MaxInputChannels,
+                outputDeviceInfo,
+                // Recording is always done in mono from one of the input device's channels.
+                // Thus, the output is also mono (i.e., output channel count is 1).
+                outputDeviceInfo != null ? 1 : 0,
+                sampleRate,
+                samplesPerBuffer,
+                sampleBufferLengthInSeconds)
         {
             if (inputDeviceInfo == null)
             {
@@ -55,47 +50,26 @@ namespace PortAudioForUnity
                 throw new ArgumentException($"{nameof(sampleBufferLengthInSeconds)} cannot be negative or zero");
             }
 
-            InputDeviceInfo = inputDeviceInfo;
-            OutputDeviceInfo = outputDeviceInfo;
             OutputAmplificationFactor = outputAmplificationFactor;
-            SampleRate = sampleRate;
-            SamplesPerBuffer = samplesPerBuffer;
-            SampleBufferLengthInSeconds = sampleBufferLengthInSeconds;
             Loop = loop;
             playRecordedSamples = outputDeviceInfo != null && outputDeviceInfo.MaxOutputChannels >= 1;
-            singleChannelSampleBufferLength = sampleRate * sampleBufferLengthInSeconds;
-            allChannelsSampleBufferLength = singleChannelSampleBufferLength * inputDeviceInfo.MaxInputChannels;
+            int singleChannelSampleBufferLength = sampleRate * sampleBufferLengthInSeconds;
+            int allChannelsSampleBufferLength = singleChannelSampleBufferLength * inputDeviceInfo.MaxInputChannels;
             allChannelsRecordedSamples = new float[allChannelsSampleBufferLength];
-
-            // Recording is always done in mono from one of the input device's channels.
-            // Thus, the output is also mono (i.e., output channel count is 1).
-            int outputChannelCount = outputDeviceInfo == null
-                ? -1
-                : 1;
-
-            portAudioSharpAudio = new Audio(
-                InputDeviceInfo?.GlobalDeviceIndex ?? -1,
-                OutputDeviceInfo?.GlobalDeviceIndex ?? -1,
-                InputChannelCount,
-                outputChannelCount,
-                sampleRate,
-                samplesPerBuffer,
-                RecordCallback);
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
-            if (isDisposed)
+            if (IsDisposed)
             {
                 return;
             }
 
-            isDisposed = true;
-            StopRecording();
-            portAudioSharpAudio?.Dispose();
+            Stop();
+            base.Dispose();
         }
 
-        private PortAudio.PaStreamCallbackResult RecordCallback(
+        protected override PortAudio.PaStreamCallbackResult AudioStreamCallback(
             IntPtr input,
             IntPtr output,
             uint samplesPerBuffer,
@@ -108,8 +82,8 @@ namespace PortAudioForUnity
             // Because this callback is called from unsafe code in a background thread,
             // this can be null when Unity has already destroyed the instance.
             if (this == null
-                || isDisposed
-                || !IsRecording)
+                || IsDisposed
+                || !IsAudioStreamStarted)
             {
                 return PortAudio.PaStreamCallbackResult.paAbort;
             }
@@ -170,17 +144,16 @@ namespace PortAudioForUnity
             return PortAudio.PaStreamCallbackResult.paContinue;
         }
 
-        public void StartRecording()
+        public void Start()
         {
-            if (isDisposed
-                || IsRecording)
+            if (IsDisposed
+                || IsAudioStreamStarted)
             {
                 return;
             }
 
             ResetRecordedSamples();
-            portAudioSharpAudio.Start();
-            IsRecording = true;
+            StartAudioStream();
         }
 
         private void ResetRecordedSamples()
@@ -189,16 +162,15 @@ namespace PortAudioForUnity
             writeAllChannelsSampleBufferIndex = 0;
         }
 
-        public void StopRecording()
+        public void Stop()
         {
-            if (isDisposed
-                || !IsRecording)
+            if (IsDisposed
+                || !IsAudioStreamStarted)
             {
                 return;
             }
 
-            portAudioSharpAudio.Stop();
-            IsRecording = false;
+            StopAudioStream();
         }
 
         public void GetRecordedSamples(int channelIndex, float[] bufferToBeFilled)

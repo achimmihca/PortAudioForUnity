@@ -16,11 +16,7 @@ namespace PortAudioForUnity
             failedToInitialize = false;
             SamplesPerBuffer = 1024;
 
-            globalDeviceIndexToSampleRecorder
-                .Values
-                .ToList()
-                .ForEach(sampleRecorder => sampleRecorder.Dispose());
-            globalDeviceIndexToSampleRecorder.Clear();
+            DisposeInputOutputDeviceControls();
 
             // Create GameObject and set "don't destroy on load" to be notified
             // when the app terminates.
@@ -36,7 +32,8 @@ namespace PortAudioForUnity
 
         private static bool isInitialized;
         private static bool failedToInitialize;
-        private static readonly Dictionary<int, PortAudioSampleRecorder> globalDeviceIndexToSampleRecorder = new();
+        private static readonly Dictionary<int, InputDeviceControl> globalDeviceIndexToInputDeviceControl = new();
+        private static readonly Dictionary<int, OutputDeviceControl> globalDeviceIndexToOutputDeviceControl = new();
 
         private static GameObject portAudioDisposeOnDestroyGameObject;
 
@@ -105,6 +102,8 @@ namespace PortAudioForUnity
         public static DeviceInfo DefaultInputDeviceInfo => GetDeviceInfo(DefaultHostApiInfo.DefaultInputDeviceGlobalIndex);
         public static DeviceInfo DefaultOutputDeviceInfo => GetDeviceInfo(DefaultHostApiInfo.DefaultOutputDeviceGlobalIndex);
 
+        public delegate void PcmReaderCallback(float[] data);
+
         public static void StartRecording(
             DeviceInfo inputDeviceInfo,
             bool loop,
@@ -124,28 +123,27 @@ namespace PortAudioForUnity
             Log($"Starting recording with input device: {inputDeviceInfo} and output device: {outputDeviceInfo}");
 
             int globalOutputDeviceIndex = outputDeviceInfo?.GlobalDeviceIndex ?? -1;
-            if (globalDeviceIndexToSampleRecorder.TryGetValue(inputDeviceInfo.GlobalDeviceIndex, out PortAudioSampleRecorder existingSampleRecorder)
-                && existingSampleRecorder != null)
+            if (globalDeviceIndexToInputDeviceControl.TryGetValue(inputDeviceInfo.GlobalDeviceIndex, out InputDeviceControl existingInputDeviceControl)
+                && existingInputDeviceControl != null)
             {
-                if (existingSampleRecorder.Loop != loop
-                    || existingSampleRecorder.SampleBufferLengthInSeconds != bufferLengthInSeconds
-                    || existingSampleRecorder.SampleRate != sampleRate
-                    || Math.Abs(existingSampleRecorder.OutputAmplificationFactor - outputAmplificationFactor) > 0.001f
-                    || existingSampleRecorder.GlobalOutputDeviceIndex != globalOutputDeviceIndex)
+                if (existingInputDeviceControl.Loop != loop
+                    || existingInputDeviceControl.SampleBufferLengthInSeconds != bufferLengthInSeconds
+                    || existingInputDeviceControl.SampleRate != sampleRate
+                    || Math.Abs(existingInputDeviceControl.OutputAmplificationFactor - outputAmplificationFactor) > 0.001f)
                 {
-                    // Cannot reuse existing sample recorder. Dispose the old one and create a new one.
-                    existingSampleRecorder.Dispose();
-                    globalDeviceIndexToSampleRecorder.Remove(inputDeviceInfo.GlobalDeviceIndex);
+                    // Cannot reuse existing contol. Dispose the old one and create a new one.
+                    existingInputDeviceControl.Dispose();
+                    globalDeviceIndexToInputDeviceControl.Remove(inputDeviceInfo.GlobalDeviceIndex);
                 }
                 else
                 {
-                    // Reuse existing sample recorder.
-                    existingSampleRecorder.StartRecording();
+                    // Reuse existing control.
+                    existingInputDeviceControl.Start();
                     return;
                 }
             }
 
-            PortAudioSampleRecorder newSampleRecorder = new PortAudioSampleRecorder(
+            InputDeviceControl newInputDeviceControl = new InputDeviceControl(
                 inputDeviceInfo,
                 outputDeviceInfo,
                 outputAmplificationFactor,
@@ -153,9 +151,69 @@ namespace PortAudioForUnity
                 SamplesPerBuffer,
                 bufferLengthInSeconds,
                 loop);
-            globalDeviceIndexToSampleRecorder[inputDeviceInfo.GlobalDeviceIndex] = newSampleRecorder;
+            globalDeviceIndexToInputDeviceControl[inputDeviceInfo.GlobalDeviceIndex] = newInputDeviceControl;
 
-            newSampleRecorder.StartRecording();
+            newInputDeviceControl.Start();
+        }
+
+        public static void StartPlayback(
+            DeviceInfo outputDeviceInfo,
+            int outputChannelCount,
+            int bufferLengthInSeconds,
+            int sampleRate,
+            PcmReaderCallback pcmReaderCallback)
+        {
+            ThrowIfNotOnMainThread();
+            InitializeIfNotDoneYet();
+
+            if (outputDeviceInfo == null)
+            {
+                throw new NullReferenceException(nameof(outputDeviceInfo));
+            }
+
+            Log($"Starting payback with output device: {outputDeviceInfo}");
+
+            if (globalDeviceIndexToOutputDeviceControl.TryGetValue(outputDeviceInfo.GlobalDeviceIndex, out OutputDeviceControl existingOutputDeviceControl)
+                && existingOutputDeviceControl != null)
+            {
+                if (existingOutputDeviceControl.SampleBufferLengthInSeconds != bufferLengthInSeconds
+                    || existingOutputDeviceControl.SampleRate != sampleRate)
+                {
+                    // Cannot reuse existing control. Dispose the old one and create a new one.
+                    existingOutputDeviceControl.Dispose();
+                    globalDeviceIndexToOutputDeviceControl.Remove(outputDeviceInfo.GlobalDeviceIndex);
+                }
+                else
+                {
+                    // Reuse existing control.
+                    existingOutputDeviceControl.Start();
+                    return;
+                }
+            }
+
+            OutputDeviceControl newOutputDeviceControl = new OutputDeviceControl(
+                outputDeviceInfo,
+                outputChannelCount,
+                sampleRate,
+                SamplesPerBuffer,
+                bufferLengthInSeconds,
+                pcmReaderCallback);
+            globalDeviceIndexToOutputDeviceControl[outputDeviceInfo.GlobalDeviceIndex] = newOutputDeviceControl;
+
+            newOutputDeviceControl.Start();
+        }
+
+        public static void StopPlayback(
+            DeviceInfo deviceInfo)
+        {
+            ThrowIfNotOnMainThread();
+            InitializeIfNotDoneYet();
+
+            if (globalDeviceIndexToOutputDeviceControl.TryGetValue(deviceInfo.GlobalDeviceIndex, out OutputDeviceControl outputDeviceControl)
+                && outputDeviceControl != null)
+            {
+                outputDeviceControl.Stop();
+            }
         }
 
         public static void SetOutputAmplificationFactor(DeviceInfo deviceInfo, float outputAmplificationFactor)
@@ -163,10 +221,10 @@ namespace PortAudioForUnity
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
 
-            if (globalDeviceIndexToSampleRecorder.TryGetValue(deviceInfo.GlobalDeviceIndex, out PortAudioSampleRecorder sampleRecorder)
-                && sampleRecorder != null)
+            if (globalDeviceIndexToInputDeviceControl.TryGetValue(deviceInfo.GlobalDeviceIndex, out InputDeviceControl inputDeviceControl)
+                && inputDeviceControl != null)
             {
-                sampleRecorder.OutputAmplificationFactor = outputAmplificationFactor;
+                inputDeviceControl.OutputAmplificationFactor = outputAmplificationFactor;
             }
         }
 
@@ -175,10 +233,10 @@ namespace PortAudioForUnity
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
 
-            if (globalDeviceIndexToSampleRecorder.TryGetValue(deviceInfo.GlobalDeviceIndex, out PortAudioSampleRecorder sampleRecorder)
-                && sampleRecorder != null)
+            if (globalDeviceIndexToInputDeviceControl.TryGetValue(deviceInfo.GlobalDeviceIndex, out InputDeviceControl inputDeviceControl)
+                && inputDeviceControl != null)
             {
-                sampleRecorder.StopRecording();
+                inputDeviceControl.Stop();
             }
         }
 
@@ -187,10 +245,10 @@ namespace PortAudioForUnity
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
 
-            if (globalDeviceIndexToSampleRecorder.TryGetValue(deviceInfo.GlobalDeviceIndex, out PortAudioSampleRecorder sampleRecorder)
-                && sampleRecorder != null)
+            if (globalDeviceIndexToInputDeviceControl.TryGetValue(deviceInfo.GlobalDeviceIndex, out InputDeviceControl inputDeviceControl)
+                && inputDeviceControl != null)
             {
-                return sampleRecorder.IsRecording;
+                return inputDeviceControl.IsRecording;
             }
 
             return false;
@@ -223,7 +281,7 @@ namespace PortAudioForUnity
 
             List<DeviceInfo> result = new();
             int apiCount = PortAudio.Pa_GetHostApiCount();
-            for (int hostApiIndex = 0; hostApiIndex < apiCount; hostApiIndex++) 
+            for (int hostApiIndex = 0; hostApiIndex < apiCount; hostApiIndex++)
             {
                 PortAudio.PaHostApiInfo paHostApiInfo = PortAudio.Pa_GetHostApiInfo(hostApiIndex);
 
@@ -254,16 +312,29 @@ namespace PortAudioForUnity
         public static void Dispose()
         {
             Log("PortAudioUtils.Dispose");
-            globalDeviceIndexToSampleRecorder
-                .Values
-                .ToList()
-                .ForEach(sampleRecorder => sampleRecorder.Dispose());
-            globalDeviceIndexToSampleRecorder.Clear();
+            DisposeInputOutputDeviceControls();
 
             PortAudio.Pa_Terminate();
 
             // Wait a short duration such that PortAudio and running recording callbacks have time to shut down properly.
             Thread.Sleep(100);
+        }
+
+        private static void DisposeInputOutputDeviceControls()
+        {
+            // Input device controls
+            globalDeviceIndexToInputDeviceControl
+                .Values
+                .ToList()
+                .ForEach(inputDeviceControl => inputDeviceControl.Dispose());
+            globalDeviceIndexToInputDeviceControl.Clear();
+
+            // Output device controls
+            globalDeviceIndexToOutputDeviceControl
+                .Values
+                .ToList()
+                .ForEach(outputDeviceControl => outputDeviceControl.Dispose());
+            globalDeviceIndexToOutputDeviceControl.Clear();
         }
 
         /**
@@ -275,10 +346,10 @@ namespace PortAudioForUnity
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
 
-            if (globalDeviceIndexToSampleRecorder.TryGetValue(deviceInfo.GlobalDeviceIndex, out PortAudioSampleRecorder sampleRecorder)
-                && sampleRecorder != null)
+            if (globalDeviceIndexToInputDeviceControl.TryGetValue(deviceInfo.GlobalDeviceIndex, out InputDeviceControl inputDeviceControl)
+                && inputDeviceControl != null)
             {
-                sampleRecorder.GetAllRecordedSamples(bufferToBeFilled);
+                inputDeviceControl.GetAllRecordedSamples(bufferToBeFilled);
             }
         }
 
@@ -290,10 +361,10 @@ namespace PortAudioForUnity
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
 
-            if (globalDeviceIndexToSampleRecorder.TryGetValue(deviceInfo.GlobalDeviceIndex, out PortAudioSampleRecorder sampleRecorder)
-                && sampleRecorder != null)
+            if (globalDeviceIndexToInputDeviceControl.TryGetValue(deviceInfo.GlobalDeviceIndex, out InputDeviceControl inputDeviceControl)
+                && inputDeviceControl != null)
             {
-                sampleRecorder.GetRecordedSamples(channelIndex, bufferToBeFilled);
+                inputDeviceControl.GetRecordedSamples(channelIndex, bufferToBeFilled);
             }
         }
 
@@ -302,10 +373,10 @@ namespace PortAudioForUnity
             ThrowIfNotOnMainThread();
             InitializeIfNotDoneYet();
 
-            if (globalDeviceIndexToSampleRecorder.TryGetValue(deviceInfo.GlobalDeviceIndex, out PortAudioSampleRecorder sampleRecorder)
-                && sampleRecorder != null)
+            if (globalDeviceIndexToInputDeviceControl.TryGetValue(deviceInfo.GlobalDeviceIndex, out InputDeviceControl inputDeviceControl)
+                && inputDeviceControl != null)
             {
-                return sampleRecorder.GetSingleChannelRecordingPosition();
+                return inputDeviceControl.GetSingleChannelRecordingPosition();
             }
 
             return 0;
