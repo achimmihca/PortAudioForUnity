@@ -177,7 +177,8 @@ namespace PortAudioForUnity
                 && existingOutputDeviceControl != null)
             {
                 if (existingOutputDeviceControl.SampleBufferLengthInSeconds != bufferLengthInSeconds
-                    || existingOutputDeviceControl.SampleRate != sampleRate)
+                    || existingOutputDeviceControl.SampleRate != sampleRate
+                    || existingOutputDeviceControl.pcmReaderCallback != pcmReaderCallback)
                 {
                     // Cannot reuse existing control. Dispose the old one and create a new one.
                     existingOutputDeviceControl.Dispose();
@@ -271,7 +272,7 @@ namespace PortAudioForUnity
 
         public static HostApiInfo GetHostApiInfo(HostApi hostApi)
         {
-            return hostApiInfos.FirstOrDefault(hostApiInfo => hostApiInfo.HostApi == hostApi);
+            return HostApiInfos.FirstOrDefault(hostApiInfo => hostApiInfo.HostApi == hostApi);
         }
 
         private static List<DeviceInfo> GetDeviceInfos()

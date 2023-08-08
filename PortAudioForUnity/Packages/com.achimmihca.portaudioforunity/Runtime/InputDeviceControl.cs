@@ -77,7 +77,7 @@ namespace PortAudioForUnity
             PortAudio.PaStreamCallbackFlags statusFlags,
             IntPtr localUserData)
         {
-            // Debug.Log($"RecordCallback - samplesPerBuffer: {samplesPerBuffer}");
+            // Debug.Log($"InputDeviceControl.AudioStreamCallback - samplesPerBuffer: {samplesPerBuffer}");
 
             // Because this callback is called from unsafe code in a background thread,
             // this can be null when Unity has already destroyed the instance.

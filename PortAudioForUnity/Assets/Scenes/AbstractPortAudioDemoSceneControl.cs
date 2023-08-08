@@ -4,16 +4,11 @@ using System.Linq;
 using PortAudioForUnity;
 using UnityEngine;
 using UnityEngine.UIElements;
-using Debug = UnityEngine.Debug;
 
 public abstract class AbstractPortAudioDemoSceneControl : MonoBehaviour
 {
     public bool overwriteHostApi;
     public HostApi hostApi = HostApi.WASAPI;
-
-    protected virtual HostApiInfo HostApiInfo => PortAudioUtils.GetHostApiInfo(MicrophoneAdapter.GetHostApi());
-    protected virtual DeviceInfo InputDeviceInfo => PortAudioUtils.GetDeviceInfo(HostApiInfo.DefaultInputDeviceGlobalIndex);
-    protected virtual DeviceInfo OutputDeviceInfo => PortAudioUtils.GetDeviceInfo(HostApiInfo.DefaultOutputDeviceGlobalIndex);
 
     protected float lastUpdateTimeInSeconds;
     protected VisualElement firstChannelAudioWaveForm;
@@ -59,9 +54,6 @@ public abstract class AbstractPortAudioDemoSceneControl : MonoBehaviour
             MicrophoneAdapter.SetHostApi(hostApi);
         }
         Debug.Log($"Using host API: {MicrophoneAdapter.GetHostApi()}");
-
-        Debug.Log($"Input device: {InputDeviceInfo?.Name}");
-        Debug.Log($"Output device: {OutputDeviceInfo?.Name}");
 
         InitUi();
     }

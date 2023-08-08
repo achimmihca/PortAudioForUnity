@@ -1,3 +1,4 @@
+using System;
 using PortAudioForUnity;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -12,11 +13,13 @@ public class PlaybackDemoSceneControl : AbstractPortAudioDemoSceneControl
     public int sampleRate;
     public int outputChannelCount;
     public bool loop;
+    public bool playOnStart;
 
     private Button startPlaybackButton;
     private Button stopPlaybackButton;
 
-    protected override DeviceInfo InputDeviceInfo => null;
+    private HostApiInfo HostApiInfo => PortAudioUtils.GetHostApiInfo(MicrophoneAdapter.GetHostApi());
+    private DeviceInfo OutputDeviceInfo => PortAudioUtils.GetDeviceInfo(HostApiInfo.DefaultOutputDeviceGlobalIndex);
 
     protected override void Start()
     {
@@ -32,22 +35,19 @@ public class PlaybackDemoSceneControl : AbstractPortAudioDemoSceneControl
         }
         Debug.Log($"Input channel count: {outputChannelCount}");
         Debug.Log($"Sample rate: {sampleRate}");
-        Debug.Log($"Loop recording: {loop}");
+        Debug.Log($"Loop playback: {loop}");
 
         demoAudioClipSamples = new float[demoAudioClip.samples * demoAudioClip.channels];
         demoAudioClip.GetData(demoAudioClipSamples, 0);
 
-        PortAudioUtils.StartPlayback(
-            OutputDeviceInfo,
-            outputChannelCount,
-            bufferLengthInSeconds,
-            sampleRate,
-            OnFillSampleBuffer);
-
-        if (!loop)
+        if (playOnStart)
         {
-            Debug.Log($"Will stop playback in {demoAudioClip.length} seconds");
-            StartCoroutine(ExecuteAfterDelayInSeconds(demoAudioClip.length, () => StopPlayback()));
+            StartPlayback();
+            if (!loop)
+            {
+                Debug.Log($"Will stop playback in {demoAudioClip.length} seconds");
+                StartCoroutine(ExecuteAfterDelayInSeconds(demoAudioClip.length, () => StopPlayback()));
+            }
         }
 
         InitUi();
@@ -55,8 +55,25 @@ public class PlaybackDemoSceneControl : AbstractPortAudioDemoSceneControl
         Debug.Log("Start done");
     }
 
+    private void StartPlayback()
+    {
+        PortAudioUtils.StartPlayback(
+            OutputDeviceInfo,
+            outputChannelCount,
+            bufferLengthInSeconds,
+            sampleRate,
+            OnFillSampleBuffer);
+    }
+
     private void OnFillSampleBuffer(float[] data)
     {
+        if (outputSampleIndex >= demoAudioClipSamples.Length
+            && !loop)
+        {
+            Array.Clear(data, 0, data.Length);
+            return;
+        }
+
         for (int i = 0; i < data.Length; i++)
         {
             outputSampleIndex %= demoAudioClipSamples.Length;
@@ -66,6 +83,7 @@ public class PlaybackDemoSceneControl : AbstractPortAudioDemoSceneControl
             if (outputSampleIndex >= demoAudioClipSamples.Length
                 && !loop)
             {
+                Array.Clear(data, i, data.Length - i);
                 return;
             }
         }
@@ -79,13 +97,13 @@ public class PlaybackDemoSceneControl : AbstractPortAudioDemoSceneControl
         startPlaybackButton = uiDocument.rootVisualElement.Q<Button>("startPlaybackButton");
         stopPlaybackButton = uiDocument.rootVisualElement.Q<Button>("stopPlaybackButton");
 
-        startPlaybackButton.RegisterCallback<ClickEvent>(_ =>
-            PortAudioUtils.StartPlayback(OutputDeviceInfo, outputChannelCount, bufferLengthInSeconds, sampleRate, OnFillSampleBuffer));
+        startPlaybackButton.RegisterCallback<ClickEvent>(_ => StartPlayback());
         stopPlaybackButton.RegisterCallback<ClickEvent>(_ => StopPlayback());
     }
 
     private void StopPlayback()
     {
         PortAudioUtils.StopPlayback(OutputDeviceInfo);
+        outputSampleIndex = 0;
     }
 }

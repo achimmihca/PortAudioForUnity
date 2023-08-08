@@ -62,12 +62,14 @@ namespace PortAudioForUnity
 
         protected void StartAudioStream()
         {
-            portAudioSharpAudio.Start();
+            // First set the flag, then start the PortAudioSharp method. Otherwise the callback may abort concurrently.
             IsAudioStreamStarted = true;
+            portAudioSharpAudio.Start();
         }
 
         protected void StopAudioStream()
         {
+            // First stop PortAudio, then set the flag. Otherwise the callback may abort concurrently.
             portAudioSharpAudio.Stop();
             IsAudioStreamStarted = false;
         }

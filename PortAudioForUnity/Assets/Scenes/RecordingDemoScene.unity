@@ -295,16 +295,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   overwriteHostApi: 1
   hostApi: 13
-  targetFrameRate: 30
-  audioWaveFormRefreshRateTimeInSeconds: 0
   audioSource: {fileID: 1644096721}
-  recordingLengthInSeconds: 1
+  bufferLengthInSeconds: 2
   sampleRate: 0
-  inputChannelCount: 0
   inputChannelIndex: 0
   loop: 1
-  playRecordedAudio: 0
+  playRecordedAudio: 1
   playRecordedAudioAmplificationFactor: 1
+  audioWaveFormRefreshRateTimeInSeconds: 0
 --- !u!4 &1644096720
 Transform:
   m_ObjectHideFlags: 0

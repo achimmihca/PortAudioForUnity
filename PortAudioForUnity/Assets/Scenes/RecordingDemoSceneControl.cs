@@ -16,7 +16,11 @@ public class RecordingDemoSceneControl : AbstractPortAudioDemoSceneControl
     public float playRecordedAudioAmplificationFactor = 1;
     public float audioWaveFormRefreshRateTimeInSeconds;
 
-    protected override DeviceInfo OutputDeviceInfo => playRecordedAudio ? base.OutputDeviceInfo : null;
+    private HostApiInfo HostApiInfo => PortAudioUtils.GetHostApiInfo(MicrophoneAdapter.GetHostApi());
+    private DeviceInfo InputDeviceInfo => PortAudioUtils.GetDeviceInfo(HostApiInfo.DefaultInputDeviceGlobalIndex);
+    private DeviceInfo OutputDeviceInfo => playRecordedAudio
+        ? PortAudioUtils.GetDeviceInfo(HostApiInfo.DefaultOutputDeviceGlobalIndex)
+        : null;
 
     private Button startRecordingButton;
     private Button stopRecordingButton;
@@ -41,13 +45,7 @@ public class RecordingDemoSceneControl : AbstractPortAudioDemoSceneControl
         Debug.Log($"Sample rate: {sampleRate}");
         Debug.Log($"Loop recording: {loop}");
 
-        PortAudioUtils.StartRecording(
-            InputDeviceInfo,
-            loop,
-            bufferLengthInSeconds,
-            sampleRate,
-            OutputDeviceInfo,
-            playRecordedAudioAmplificationFactor);
+        StartRecording();
 
         if (!loop)
         {
@@ -85,6 +83,17 @@ public class RecordingDemoSceneControl : AbstractPortAudioDemoSceneControl
         PortAudioUtils.SetOutputAmplificationFactor(InputDeviceInfo, playRecordedAudioAmplificationFactor);
     }
 
+    private void StartRecording()
+    {
+        PortAudioUtils.StartRecording(
+            InputDeviceInfo,
+            loop,
+            bufferLengthInSeconds,
+            sampleRate,
+            OutputDeviceInfo,
+            playRecordedAudioAmplificationFactor);
+    }
+
     private void UpdateAudioWaveForm()
     {
         float[] firstChannelSamples = new float[sampleRate * bufferLengthInSeconds];
@@ -109,8 +118,7 @@ public class RecordingDemoSceneControl : AbstractPortAudioDemoSceneControl
         playRecordingMonoButton = uiDocument.rootVisualElement.Q<Button>("playRecordingMonoButton");
         playRecordingAllChannelsButton = uiDocument.rootVisualElement.Q<Button>("playRecordingAllChannelsButton");
 
-        startRecordingButton.RegisterCallback<ClickEvent>(_ =>
-        PortAudioUtils.StartRecording(InputDeviceInfo, loop, bufferLengthInSeconds, sampleRate, OutputDeviceInfo, playRecordedAudioAmplificationFactor));
+        startRecordingButton.RegisterCallback<ClickEvent>(_ => StartRecording());
         stopRecordingButton.RegisterCallback<ClickEvent>(_ => StopRecording());
         playRecordingMonoButton.RegisterCallback<ClickEvent>(_ => PlayRecordedAudioMono());
         playRecordingAllChannelsButton.RegisterCallback<ClickEvent>(_ => PlayRecordedAudioAllChannels());

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using PortAudioSharp;
-using UnityEngine;
 
 namespace PortAudioForUnity
 {
@@ -9,7 +8,7 @@ namespace PortAudioForUnity
     {
         private readonly float[] sampleBuffer;
 
-        private readonly PortAudioUtils.PcmReaderCallback pcmReaderCallback;
+        internal readonly PortAudioUtils.PcmReaderCallback pcmReaderCallback;
 
         internal OutputDeviceControl(
             DeviceInfo outputDeviceInfo,
@@ -57,8 +56,6 @@ namespace PortAudioForUnity
             PortAudio.PaStreamCallbackFlags statusFlags,
             IntPtr localUserData)
         {
-            // Debug.Log($"RecordCallback - samplesPerBuffer: {samplesPerBuffer}");
-
             // Because this callback is called from unsafe code in a background thread,
             // this can be null when Unity has already destroyed the instance.
             if (this == null
