@@ -73,14 +73,25 @@ namespace PortAudioSharp
                 throw new Exception("Can't initialize audio");
             }
 
-            this.inputDeviceInfo = PortAudio.Pa_GetDeviceInfo(inputDeviceIndex);
+            this.inputDeviceInfo = inputDeviceIndex >= 0
+                ? PortAudio.Pa_GetDeviceInfo(inputDeviceIndex)
+                : default;
             this.outputDeviceInfo = outputDeviceIndex >= 0
                 ? PortAudio.Pa_GetDeviceInfo(outputDeviceIndex)
                 : default;
-            log("input device:\n" + inputDeviceInfo.ToString());
+
+            if (inputDeviceIndex >= 0)
+            {
+                log("input device:\n" + inputDeviceInfo);
+            }
+            else
+            {
+                log("input device: none");
+            }
+
             if (outputDeviceIndex >= 0)
             {
-                log("output device:\n" + outputDeviceInfo.ToString());
+                log("output device:\n" + outputDeviceInfo);
             }
             else
             {

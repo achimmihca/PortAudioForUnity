@@ -1,19 +1,16 @@
 using System;
-using Codice.Client.GameUI.Checkin;
 using PortAudioForUnity;
 using UnityEngine;
 using UnityEngine.UIElements;
 
 [RequireComponent(typeof(AudioSource))]
-public class LatencyMeasurementSceneControl : MonoBehaviour
+public class RecordingLatencyDemoSceneControl : MonoBehaviour
 {
     public HostApi hostApi;
     public int inputDeviceChannelIndex;
     public float sampleVolumeThreshold;
+    public bool usePortAudioToPlaySound = true;
 
-    // Generate a sine wave in OnAudioFilterRead
-    private int outputChannelCount = 2;
-    private int totalSampleIndex;
     private AudioSource audioSource;
 
     // Measure time until first sample above threshold volume is recorded
@@ -24,30 +21,75 @@ public class LatencyMeasurementSceneControl : MonoBehaviour
 
     private int onAudioFilterReadSampleRate;
 
-    public HostApiInfo HostApiInfo => PortAudioUtils.GetHostApiInfo(hostApi);
+    private HostApiInfo HostApiInfo => PortAudioUtils.GetHostApiInfo(hostApi);
+    private DeviceInfo OutputDeviceInfo => PortAudioUtils.GetDeviceInfo(HostApiInfo.DefaultOutputDeviceGlobalIndex);
     private DeviceInfo InputDeviceInfo => PortAudioUtils.GetDeviceInfo(HostApiInfo.DefaultInputDeviceGlobalIndex);
 
     private Button startMeasurementButton;
     private VisualElement firstChannelAudioWaveForm;
     private AudioWaveFormVisualization firstChannelAudioWaveFormVisualization;
 
-    private void Awake()
-    {
-        onAudioFilterReadSampleRate = AudioSettings.outputSampleRate;
-        audioSource = GetComponent<AudioSource>();
-    }
+    private SineToneGenerator portAudioSineToneGenerator;
+    private SineToneGenerator unitySineToneGenerator;
 
     private void Start()
     {
+        audioSource = GetComponent<AudioSource>();
+        audioSource.loop = true;
+        audioSource.Play();
+
+        onAudioFilterReadSampleRate = AudioSettings.outputSampleRate;
         if (sampleVolumeThreshold <= 0)
         {
             sampleVolumeThreshold = 0.1f;
         }
         Debug.Log($"Threshold volume: {sampleVolumeThreshold}");
 
+        portAudioSineToneGenerator = new(440, (int)OutputDeviceInfo.DefaultSampleRate);
+        unitySineToneGenerator = new(440, onAudioFilterReadSampleRate);
+
         InitUi();
 
         StartRecording();
+
+        PortAudioUtils.StartPlayback(
+            OutputDeviceInfo,
+            OutputDeviceInfo.MaxOutputChannels,
+            1,
+            (int)OutputDeviceInfo.DefaultSampleRate,
+            OnPortAudioReadSamples);
+    }
+
+    private void OnAudioFilterRead(float[] data, int channelCount)
+    {
+        if (usePortAudioToPlaySound)
+        {
+            return;
+        }
+
+        if (!shouldMakeNoise)
+        {
+            Array.Clear(data, 0, data.Length);
+            return;
+        }
+
+        unitySineToneGenerator.FillBuffer(data, channelCount);
+    }
+
+    private void OnPortAudioReadSamples(float[] data)
+    {
+        if (!usePortAudioToPlaySound)
+        {
+            return;
+        }
+
+        if (!shouldMakeNoise)
+        {
+            Array.Clear(data, 0, data.Length);
+            return;
+        }
+
+        portAudioSineToneGenerator.FillBuffer(data, OutputDeviceInfo.MaxOutputChannels);
     }
 
     private void InitUi()
@@ -82,7 +124,10 @@ public class LatencyMeasurementSceneControl : MonoBehaviour
                 if (micSampleBuffer[i] > sampleVolumeThreshold)
                 {
                     StopMeasurement();
-                    Debug.Log($"Recorded sample above threshold after {millisSinceNoiseStart} ms with host API {HostApiInfo.HostApi}");
+                    string hostApiText = usePortAudioToPlaySound
+                        ? $"host API {HostApiInfo.HostApi}"
+                        : $"Unity API";
+                    Debug.Log($"Recorded sample above threshold after {millisSinceNoiseStart} ms with {hostApiText}");
                     shouldMakeNoise = false;
                     break;
                 }
@@ -106,10 +151,6 @@ public class LatencyMeasurementSceneControl : MonoBehaviour
 
     private void StartMeasurement()
     {
-        // Start AudioSource such that OnAudioFilterRead is called
-        audioSource.loop = true;
-        audioSource.Play();
-
         noiseStartInMillis = GetUnixTimeMilliseconds();
         maxSampleValue = 0;
         shouldMakeNoise = true;
@@ -117,7 +158,6 @@ public class LatencyMeasurementSceneControl : MonoBehaviour
 
     private void StopMeasurement()
     {
-        audioSource.Stop();
         noiseStartInMillis = 0;
         maxSampleValue = 0;
         shouldMakeNoise = false;
@@ -162,26 +202,5 @@ public class LatencyMeasurementSceneControl : MonoBehaviour
     {
         // See https://stackoverflow.com/questions/4016483/get-time-in-milliseconds-using-c-sharp
         return DateTimeOffset.Now.ToUnixTimeMilliseconds();
-    }
-
-    private void OnAudioFilterRead(float[] data, int channelCount)
-    {
-        if (shouldMakeNoise)
-        {
-            FillBufferWithSineWave(data, channelCount, 440);
-        }
-    }
-
-    private void FillBufferWithSineWave(float[] data, int channelCount, int frequency)
-    {
-        for (int sampleIndex = 0; sampleIndex < data.Length; sampleIndex += channelCount)
-        {
-            for (int channelIndex = 0; channelIndex < outputChannelCount; channelIndex++)
-            {
-                data[sampleIndex + channelIndex] = Mathf.Sin(2 * Mathf.PI * frequency * totalSampleIndex / onAudioFilterReadSampleRate);
-            }
-            data[sampleIndex] = Mathf.Sin(2 * Mathf.PI * frequency * totalSampleIndex / onAudioFilterReadSampleRate);
-            totalSampleIndex++;
-        }
     }
 }
