@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v3.0.0]
+- play audio on output device without recording
+
 ## [v2.2.0]
 - getter for default input / output device of selected host API in MicrophoneAdapter
 
